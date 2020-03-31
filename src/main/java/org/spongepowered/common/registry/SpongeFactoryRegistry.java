@@ -39,6 +39,11 @@ import org.spongepowered.common.registry.type.advancement.SpongeAdvancementCrite
 import org.spongepowered.common.relocate.co.aikar.timings.SpongeTimingsFactory;
 import org.spongepowered.common.resourcepack.SpongeResourcePackFactory;
 import org.spongepowered.common.text.serializer.SpongeTextSerializerFactory;
+import org.spongepowered.api.command.CommandCause;
+import org.spongepowered.api.registry.DuplicateRegistrationException;
+import org.spongepowered.api.registry.FactoryRegistry;
+import org.spongepowered.api.registry.UnknownTypeException;
+import org.spongepowered.common.command.manager.SpongeCommandCauseFactory;
 
 import java.util.Map;
 
@@ -64,7 +69,7 @@ public final class SpongeFactoryRegistry implements FactoryRegistry {
         return (T) duck;
     }
 
-    public <T> void registerFactory(Class<T> factoryClass, T factory) {
+    public <T> SpongeFactoryRegistry registerFactory(Class<T> factoryClass, T factory) {
         checkNotNull(factoryClass);
         checkNotNull(factory);
 
@@ -73,6 +78,7 @@ public final class SpongeFactoryRegistry implements FactoryRegistry {
         }
 
         this.factories.put(factoryClass, factory);
+        return this;
     }
 
     public void registerDefaultFactories() {
@@ -80,5 +86,7 @@ public final class SpongeFactoryRegistry implements FactoryRegistry {
         this.registerFactory(AdvancementCriterion.Factory.class, SpongeAdvancementCriterionFactory.INSTANCE);
         this.registerFactory(TimingsFactory.class, SpongeTimingsFactory.INSTANCE);
         this.registerFactory(ResourcePack.Factory.class, SpongeResourcePackFactory.INSTANCE);
+        this.registerFactory(CommandCause.Factory.class, SpongeCommandCauseFactory.INSTANCE);
     }
+
 }

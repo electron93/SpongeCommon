@@ -43,6 +43,7 @@ import org.spongepowered.api.event.SpongeEventFactory;
 import org.spongepowered.api.event.game.state.GameStateEvent;
 import org.spongepowered.api.plugin.PluginContainer;
 import org.spongepowered.api.util.Direction;
+import org.spongepowered.common.command.manager.SpongeCommandManager;
 import org.spongepowered.common.config.SpongeConfig;
 import org.spongepowered.common.config.SpongeConfigSaveManager;
 import org.spongepowered.common.config.type.CustomDataConfig;
@@ -154,6 +155,10 @@ public final class SpongeImpl {
 
     public static SpongeWorldManager getWorldManager() {
         return check(worldManager);
+    }
+
+    public static SpongeCommandManager getCommandManager() {
+        return check(commandManager);
     }
 
     public static PluginContainer getPlugin() {
