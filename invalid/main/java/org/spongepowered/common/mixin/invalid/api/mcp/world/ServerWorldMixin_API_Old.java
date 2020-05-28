@@ -175,16 +175,6 @@ public abstract class ServerWorldMixin_API_Old extends WorldMixin_API {
         this.pendingTickListEntriesTreeSet.remove(update);
     }
 
-    @Override
-    public boolean save() throws IOException {
-        try {
-            this.shadow$save((IProgressUpdate) null, false, false);
-        } catch (SessionLockException e) {
-            throw new IOException(e);
-        }
-
-        return true;
-    }
 
     @Override
     public Collection<ScheduledBlockUpdate> getScheduledUpdates(final int x, final int y, final int z) {
@@ -305,33 +295,6 @@ public abstract class ServerWorldMixin_API_Old extends WorldMixin_API {
         }
     }
 
-    @Override
-    public BlockSnapshot createSnapshot(final int x, final int y, final int z) {
-        if (!this.containsBlock(x, y, z)) {
-            return BlockSnapshot.empty();
-        }
-        if (!this.isChunkLoaded(x >> 4, z >> 4, false)) {
-            return BlockSnapshot.empty();
-        }
-        final BlockPos pos = new BlockPos(x, y, z);
-        final SpongeBlockSnapshotBuilder builder = SpongeBlockSnapshotBuilder.pooled();
-        builder.worldId(this.getProperties().getUniqueId())
-            .position(new Vector3i(x, y, z));
-        final Chunk chunk = this.shadow$getChunkAt(pos);
-        final net.minecraft.block.BlockState state = chunk.getBlockState(pos);
-        builder.blockState(state);
-        final net.minecraft.tileentity.TileEntity tile = chunk.getTileEntity(pos, Chunk.CreateEntityType.CHECK);
-        if (tile != null) {
-            TrackingUtil.addTileEntityToBuilder(tile, builder);
-        }
-        ((ChunkBridge) chunk).bridge$getBlockOwnerUUID(pos).ifPresent(builder::creator);
-        ((ChunkBridge) chunk).bridge$getBlockNotifierUUID(pos).ifPresent(builder::notifier);
-
-        builder.flag(BlockChangeFlags.NONE);
-
-
-        return builder.build();
-    }
 
     @Override
     public Collection<Entity> spawnEntities(final Iterable<? extends Entity> entities) {
@@ -350,55 +313,6 @@ public abstract class ServerWorldMixin_API_Old extends WorldMixin_API {
             builder.add(entity);
         }
         return builder.build();
-    }
-
-    @SuppressWarnings("ResultOfMethodCallIgnored")
-    @Override
-    public void triggerExplosion(org.spongepowered.api.world.explosion.Explosion explosion) {
-        Preconditions.checkNotNull(explosion, "explosion");
-        // Sponge start
-        this.processingExplosion = true;
-        // Set up the pre event
-        final ExplosionEvent.Pre
-            event =
-            SpongeEventFactory.createExplosionEventPre(Sponge.getCauseStackManager().getCurrentCause(),
-                explosion, this);
-        if (SpongeImpl.postEvent(event)) {
-            this.processingExplosion = false;
-            return;
-        }
-        explosion = event.getExplosion();
-        final Explosion mcExplosion;
-        try {
-            // Since we already have the API created implementation Explosion, let's use it.
-            mcExplosion = (Explosion) explosion;
-        } catch (Exception e) {
-            new PrettyPrinter(60).add("Explosion not compatible with this implementation").centre().hr()
-                .add("An explosion that was expected to be used for this implementation does not")
-                .add("originate from this implementation.")
-                .add(e)
-                .trace();
-            return;
-        }
-
-        try (final PhaseContext<?> ignored = GeneralPhase.State.EXPLOSION.createPhaseContext(PhaseTracker.SERVER)
-            .explosion((Explosion) explosion)
-            .source(explosion.getSourceExplosive().isPresent() ? explosion.getSourceExplosive() : this)) {
-            ignored.buildAndSwitch();
-            final boolean damagesTerrain = explosion.shouldBreakBlocks();
-            // Sponge End
-
-            mcExplosion.doExplosionA();
-            mcExplosion.doExplosionB(false);
-
-            if (!damagesTerrain) {
-                mcExplosion.clearAffectedBlockPositions();
-            }
-
-            // Sponge Start - end processing
-            this.processingExplosion = false;
-        }
-        // Sponge End
     }
 
     @SuppressWarnings("ResultOfMethodCallIgnored")

@@ -24,6 +24,8 @@
  */
 package org.spongepowered.common.mixin.api.mcp.world;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import com.google.common.collect.ImmutableList;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
@@ -68,25 +70,40 @@ import net.minecraft.world.storage.DimensionSavedDataManager;
 import net.minecraft.world.storage.MapData;
 import net.minecraft.world.storage.SaveHandler;
 import net.minecraft.world.storage.SessionLockException;
-import org.spongepowered.api.entity.living.player.Player;
+import org.spongepowered.api.Server;
+import org.spongepowered.api.Sponge;
 import org.spongepowered.api.entity.living.player.server.ServerPlayer;
+import org.spongepowered.api.event.SpongeEventFactory;
+import org.spongepowered.api.event.world.ExplosionEvent;
+import org.spongepowered.api.world.ChunkRegenerateFlag;
+import org.spongepowered.api.world.storage.WorldStorage;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.util.PrettyPrinter;
+import org.spongepowered.common.SpongeImpl;
+import org.spongepowered.common.accessor.world.raid.RaidManagerAccessor;
+import org.spongepowered.common.event.tracking.PhaseContext;
+import org.spongepowered.common.event.tracking.PhaseTracker;
+import org.spongepowered.common.event.tracking.phase.general.GeneralPhase;
+import org.spongepowered.common.util.VecHelper;
+import org.spongepowered.math.vector.Vector3i;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import java.io.IOException;
 import java.io.Writer;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.BooleanSupplier;
 import java.util.function.Predicate;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 @Mixin(ServerWorld.class)
-public abstract class ServerWorldMixin_API extends WorldMixin_API implements org.spongepowered.api.world.server.ServerWorld {
+public abstract class ServerWorldMixin_API extends WorldMixin_API<org.spongepowered.api.world.server.ServerWorld> implements org.spongepowered.api.world.server.ServerWorld {
 
 
     @Shadow public abstract void shadow$tick(BooleanSupplier p_72835_1_);
@@ -173,7 +190,6 @@ public abstract class ServerWorldMixin_API extends WorldMixin_API implements org
     @Shadow public abstract LongSet shadow$getForcedChunks();
     @Shadow public abstract boolean shadow$forceChunk(int p_217458_1_, int p_217458_2_, boolean p_217458_3_);
     @Shadow public abstract List<ServerPlayerEntity> shadow$getPlayers();
-    @Shadow public abstract void shadow$func_217393_a(BlockPos p_217393_1_, BlockState p_217393_2_, BlockState p_217393_3_);
     @Shadow public abstract PointOfInterestManager shadow$getPointOfInterestManager();
     @Shadow public abstract boolean shadow$func_217483_b_(BlockPos p_217483_1_);
     @Shadow public abstract boolean shadow$func_222887_a(SectionPos p_222887_1_);
@@ -195,10 +211,147 @@ public abstract class ServerWorldMixin_API extends WorldMixin_API implements org
     @Shadow @Final private List<ServerPlayerEntity> players;
 
 
+    // ServerWorld
 
- @SuppressWarnings("unchecked")
- @Override
- public Collection<ServerPlayer> getPlayers() {
-  return ImmutableList.copyOf((Collection<ServerPlayer>) (Collection<?>) this.shadow$getPlayers());
- }
+    @Override public Server getServer() {
+        return (Server) this.shadow$getServer();
+    }
+
+    @Override
+    public Optional<org.spongepowered.api.world.chunk.Chunk> regenerateChunk(int cx, int cy, int cz, ChunkRegenerateFlag flag) {
+        // TODO see ServerWorldMixin_API_Old
+    }
+
+    @Override
+    public Path getDirectory() {
+        return this.shadow$getSaveHandler().getWorldDirectory().toPath();
+    }
+
+    @Override
+    public WorldStorage getWorldStorage() {
+        return (WorldStorage) this.shadow$getChunkProvider();
+    }
+
+    @Override
+    public boolean save() throws IOException {
+        try {
+            this.shadow$save((IProgressUpdate) null, false, false);
+        } catch (SessionLockException e) {
+            throw new IOException(e);
+        }
+        return true;
+    }
+
+    @Override
+    public boolean unloadChunk(org.spongepowered.api.world.chunk.Chunk chunk) {
+        this.shadow$onChunkUnloading((Chunk) chunk);
+        return true;
+    }
+
+    // TODO move to bridge?
+    private boolean impl$processingExplosion;
+    @Override
+    public void triggerExplosion(org.spongepowered.api.world.explosion.Explosion explosion) {
+        checkNotNull(explosion, "explosion");
+        // Sponge start
+        this.impl$processingExplosion = true;
+        // Set up the pre event
+        final ExplosionEvent.Pre
+                event =
+                SpongeEventFactory.createExplosionEventPre(Sponge.getCauseStackManager().getCurrentCause(),
+                        explosion, this);
+        if (SpongeImpl.postEvent(event)) {
+            this.impl$processingExplosion = false;
+            return;
+        }
+        explosion = event.getExplosion();
+        final Explosion mcExplosion;
+        try {
+            // Since we already have the API created implementation Explosion, let's use it.
+            mcExplosion = (Explosion) explosion;
+        } catch (Exception e) {
+            new PrettyPrinter(60).add("Explosion not compatible with this implementation").centre().hr()
+                    .add("An explosion that was expected to be used for this implementation does not")
+                    .add("originate from this implementation.")
+                    .add(e)
+                    .trace();
+            return;
+        }
+
+        try (final PhaseContext<?> ignored = GeneralPhase.State.EXPLOSION.createPhaseContext(PhaseTracker.SERVER)
+                .explosion((Explosion) explosion)
+                .source(explosion.getSourceExplosive().isPresent() ? explosion.getSourceExplosive() : this)) {
+            ignored.buildAndSwitch();
+            final boolean damagesTerrain = explosion.shouldBreakBlocks();
+            // Sponge End
+
+            mcExplosion.doExplosionA();
+            mcExplosion.doExplosionB(false);
+
+            if (!damagesTerrain) {
+                mcExplosion.clearAffectedBlockPositions();
+            }
+
+            // Sponge Start - end processing
+            this.impl$processingExplosion = false;
+        }
+        // Sponge End
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public Collection<ServerPlayer> getPlayers() {
+        return ImmutableList.copyOf((Collection<ServerPlayer>) (Collection<?>) this.shadow$getPlayers());
+    }
+
+    @Override
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public Collection<org.spongepowered.api.raid.Raid> getRaids() {
+        final RaidManagerAccessor raidManager = (RaidManagerAccessor) this.shadow$getRaids();
+        return (Collection<org.spongepowered.api.raid.Raid>) (Collection) raidManager.accessor$getById().values();
+    }
+
+    @Override
+    public Optional<org.spongepowered.api.raid.Raid> getRaidAt(Vector3i blockPosition) {
+        org.spongepowered.api.raid.Raid raid = (org.spongepowered.api.raid.Raid) this.shadow$findRaid(VecHelper.toBlockPos(blockPosition));
+        return Optional.ofNullable(raid);
+    }
+
+    // InteractableVolume
+
+//    @Override
+//    public boolean hitBlock(int x, int y, int z, Direction side, GameProfile profile) {
+//        return false;
+//    }
+//
+//    @Override
+//    public boolean interactBlock(int x, int y, int z, Direction side, GameProfile profile) {
+//        return false;
+//    }
+//
+//    @Override
+//    public boolean interactBlockWith(int x, int y, int z, ItemStack itemStack, Direction side, GameProfile profile) {
+//        return false;
+//    }
+//
+//    @Override
+//    public boolean placeBlock(int x, int y, int z, org.spongepowered.api.block.BlockState block, Direction side, GameProfile profile) {
+//        return false;
+//    }
+//
+//    @Override
+//    public boolean digBlock(int x, int y, int z, GameProfile profile) {
+//        return false;
+//    }
+//
+//    @Override
+//    public boolean digBlockWith(int x, int y, int z, ItemStack itemStack, GameProfile profile) {
+//        return false;
+//    }
+//
+//    @Override
+//    public Duration getBlockDigTimeWith(int x, int y, int z, ItemStack itemStack, GameProfile profile) {
+//        return null;
+//    }
+
 }

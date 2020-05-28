@@ -58,45 +58,40 @@ import net.minecraft.world.chunk.ChunkStatus;
 import net.minecraft.world.chunk.IChunk;
 import net.minecraft.world.dimension.Dimension;
 import net.minecraft.world.gen.Heightmap;
+import net.minecraft.world.server.ChunkHolder;
+import net.minecraft.world.server.ServerChunkProvider;
 import net.minecraft.world.storage.MapData;
 import net.minecraft.world.storage.WorldInfo;
 import org.apache.logging.log4j.Logger;
-import org.checkerframework.checker.nullness.qual.Nullable;
+import org.spongepowered.api.Server;
 import org.spongepowered.api.block.BlockSnapshot;
 import org.spongepowered.api.entity.living.player.Player;
-import org.spongepowered.api.service.context.Context;
-import org.spongepowered.api.text.Text;
-import org.spongepowered.api.text.channel.MessageChannel;
-import org.spongepowered.api.text.chat.ChatType;
 import org.spongepowered.api.world.BlockChangeFlag;
-import org.spongepowered.api.world.ChunkRegenerateFlag;
+import org.spongepowered.api.world.BlockChangeFlags;
 import org.spongepowered.api.world.Location;
 import org.spongepowered.api.world.World;
 import org.spongepowered.api.world.chunk.Chunk;
-import org.spongepowered.api.world.explosion.Explosion;
-import org.spongepowered.api.world.storage.WorldStorage;
-import org.spongepowered.api.world.teleport.PortalAgent;
-import org.spongepowered.api.world.volume.archetype.ArchetypeVolume;
-import org.spongepowered.api.world.weather.Weather;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
-import org.spongepowered.math.vector.Vector3d;
+import org.spongepowered.common.accessor.world.server.ChunkManagerAccessor;
+import org.spongepowered.common.block.SpongeBlockSnapshotBuilder;
+import org.spongepowered.common.bridge.world.chunk.ChunkBridge;
+import org.spongepowered.common.event.tracking.TrackingUtil;
+import org.spongepowered.common.world.storage.SpongeChunkLayout;
 import org.spongepowered.math.vector.Vector3i;
 
 import java.io.IOException;
-import java.nio.file.Path;
-import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
-import java.util.UUID;
-import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 @Mixin(net.minecraft.world.World.class)
-public abstract class WorldMixin_API implements IWorldMixin_API<World>, World, IEnvironmentBlockReaderMixin_API, AutoCloseable {
+public abstract class WorldMixin_API<W extends World<W>> implements IWorldMixin_API<W>, World<W>, IEnvironmentBlockReaderMixin_API, AutoCloseable {
     @Shadow protected static @Final Logger LOGGER;
     @Shadow private static @Final Direction[] FACING_VALUES;
     @Shadow public@Final List<TileEntity> loadedTileEntityList;
@@ -140,7 +135,6 @@ public abstract class WorldMixin_API implements IWorldMixin_API<World>, World, I
     @Shadow public abstract net.minecraft.world.chunk.Chunk shadow$getChunk(int p_212866_1_, int p_212866_2_);
     @Shadow public abstract IChunk shadow$getChunk(int p_217353_1_, int p_217353_2_, ChunkStatus p_217353_3_, boolean p_217353_4_);
     @Shadow public abstract boolean shadow$setBlockState(BlockPos p_180501_1_, BlockState p_180501_2_, int p_180501_3_);
-    @Shadow public abstract void shadow$func_217393_a(BlockPos p_217393_1_, BlockState p_217393_2_, BlockState p_217393_3_);
     @Shadow public abstract boolean shadow$removeBlock(BlockPos p_217377_1_, boolean p_217377_2_);
     @Shadow public abstract boolean shadow$destroyBlock(BlockPos p_175655_1_, boolean p_175655_2_);
     @Shadow public abstract boolean shadow$setBlockState(BlockPos p_175656_1_, BlockState p_175656_2_);
@@ -166,8 +160,6 @@ public abstract class WorldMixin_API implements IWorldMixin_API<World>, World, I
     @Shadow public abstract float shadow$getCelestialAngleRadians(float p_72929_1_);
     @Shadow public abstract boolean shadow$addTileEntity(TileEntity p_175700_1_);
     @Shadow public abstract void shadow$addTileEntities(Collection<TileEntity> p_147448_1_);
-    @Shadow public abstract void shadow$func_217391_K(); // tileTileEntities
-    @Shadow public abstract void shadow$func_217390_a(Consumer<Entity> p_217390_1_, Entity p_217390_2_);
     @Shadow public abstract boolean shadow$checkBlockCollision(AxisAlignedBB p_72829_1_);
     @Shadow public abstract boolean shadow$isFlammableWithin(AxisAlignedBB p_147470_1_);
     @Shadow public abstract boolean shadow$isMaterialInBB(AxisAlignedBB p_72875_1_, Material p_72875_2_);
@@ -176,10 +168,7 @@ public abstract class WorldMixin_API implements IWorldMixin_API<World>, World, I
     @Shadow public abstract net.minecraft.world.Explosion shadow$createExplosion(@javax.annotation.Nullable Entity p_217401_1_, @javax.annotation.Nullable DamageSource p_217401_2_, double p_217401_3_, double p_217401_5_, double p_217401_7_, float p_217401_9_, boolean p_217401_10_, net.minecraft.world.Explosion.Mode p_217401_11_);
     @Shadow public abstract boolean shadow$extinguishFire(@javax.annotation.Nullable PlayerEntity p_175719_1_, BlockPos p_175719_2_, Direction p_175719_3_);
     @Shadow public abstract @javax.annotation.Nullable TileEntity shadow$getTileEntity(BlockPos p_175625_1_);
-    @Shadow private @javax.annotation.Nullable TileEntity shadow$getPendingTileEntityAt(BlockPos p_189508_1_) {
-        // Shadowed
-        return null;
-    }
+    @Shadow protected abstract @javax.annotation.Nullable TileEntity shadow$getPendingTileEntityAt(BlockPos p_189508_1_);
     @Shadow public abstract void shadow$setTileEntity(BlockPos p_175690_1_, @javax.annotation.Nullable TileEntity p_175690_2_);
     @Shadow public abstract void shadow$removeTileEntity(BlockPos p_175713_1_);
     @Shadow public abstract boolean shadow$isBlockPresent(BlockPos p_195588_1_);
@@ -243,49 +232,69 @@ public abstract class WorldMixin_API implements IWorldMixin_API<World>, World, I
     @Shadow public abstract boolean shadow$hasBlockState(BlockPos p_217375_1_, Predicate<BlockState> p_217375_2_);
     @Shadow public abstract RecipeManager shadow$getRecipeManager();
     @Shadow public abstract NetworkTagManager shadow$getTags();
-    @Shadow public abstract BlockPos shadow$func_217383_a(int p_217383_1_, int p_217383_2_, int p_217383_3_, int p_217383_4_);
     @Shadow public abstract boolean shadow$isSaveDisabled();
     @Shadow public abstract IProfiler shadow$getProfiler();
     @Shadow public abstract BlockPos shadow$getHeight(Heightmap.Type p_205770_1_, BlockPos p_205770_2_);
 
+    // World
+
     @Override
-    public Optional<Player> getClosestPlayer(int x, int y, int z, double distance, Predicate<? super Player> predicate) {
-        return Optional.empty();
+    public Server getServer() {
+        return null; // TODO API Optional or remove from non ServerWorld?
     }
 
     @Override
-    public BlockSnapshot createSnapshot(int x, int y, int z) {
-        return null;
-    }
+    public boolean isLoaded() {
 
-    @Override
-    public boolean restoreSnapshot(BlockSnapshot snapshot, boolean force, BlockChangeFlag flag) {
-        return false;
-    }
-
-    @Override
-    public boolean restoreSnapshot(int x, int y, int z, BlockSnapshot snapshot, boolean force, BlockChangeFlag flag) {
-        return false;
-    }
-
-    @Override
-    public Chunk getChunkAtBlock(Vector3i blockPosition) {
-        return null;
-    }
-
-    @Override
-    public Chunk getChunkAtBlock(int bx, int by, int bz) {
-        return null;
-    }
-
-    @Override
-    public Chunk getChunk(Vector3i chunkPos) {
-        return null;
     }
 
     @Override
     public Collection<? extends Player> getPlayers() {
         return IWorldMixin_API.super.getPlayers();
+    }
+
+    @Override
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public Optional<? extends Player> getClosestPlayer(int x, int y, int z, double distance, Predicate<? super Player> predicate) {
+        final PlayerEntity player = this.shadow$getClosestPlayer(x, y, z, distance, (Predicate) predicate);
+        return Optional.ofNullable((Player) player);
+    }
+
+    @Override
+    public BlockSnapshot createSnapshot(int x, int y, int z) {
+        if (!this.containsBlock(x, y, z)) {
+            return BlockSnapshot.empty();
+        }
+
+        if (!this.isChunkLoaded(x, y, z, false)) { // TODO bitshift in old impl?
+            return BlockSnapshot.empty();
+        }
+        final BlockPos pos = new BlockPos(x, y, z);
+        final SpongeBlockSnapshotBuilder builder = SpongeBlockSnapshotBuilder.pooled();
+        builder.worldId(this.getProperties().getUniqueId())
+                .position(new Vector3i(x, y, z));
+        final net.minecraft.world.chunk.Chunk chunk = this.shadow$getChunkAt(pos);
+        final net.minecraft.block.BlockState state = chunk.getBlockState(pos);
+        builder.blockState(state);
+        final net.minecraft.tileentity.TileEntity tile = chunk.getTileEntity(pos, net.minecraft.world.chunk.Chunk.CreateEntityType.CHECK);
+        if (tile != null) {
+            TrackingUtil.addTileEntityToBuilder(tile, builder);
+        }
+        ((ChunkBridge) chunk).bridge$getBlockOwnerUUID(pos).ifPresent(builder::creator);
+        ((ChunkBridge) chunk).bridge$getBlockNotifierUUID(pos).ifPresent(builder::notifier);
+
+        builder.flag(BlockChangeFlags.NONE);
+        return builder.build();
+    }
+
+    @Override
+    public boolean restoreSnapshot(BlockSnapshot snapshot, boolean force, BlockChangeFlag flag) {
+        return snapshot.restore(force, flag);
+    }
+
+    @Override
+    public boolean restoreSnapshot(int x, int y, int z, BlockSnapshot snapshot, boolean force, BlockChangeFlag flag) {
+        return snapshot.withLocation(Location.of(this, x, y, z)).restore(force, flag);
     }
 
     @Override
@@ -295,147 +304,26 @@ public abstract class WorldMixin_API implements IWorldMixin_API<World>, World, I
 
     @Override
     public Optional<Chunk> loadChunk(int cx, int cy, int cz, boolean shouldGenerate) {
-        return Optional.empty();
-    }
-
-    @Override
-    public Optional<Chunk> regenerateChunk(int cx, int cy, int cz, ChunkRegenerateFlag flag) {
-        return Optional.empty();
-    }
-
-    @Override
-    public boolean unloadChunk(Chunk chunk) {
-        return false;
+        if (!SpongeChunkLayout.instance.isValidChunk(cx, cy, cz)) {
+            return Optional.empty();
+        }
+        final AbstractChunkProvider chunkProvider = this.shadow$getChunkProvider();
+        // If we aren't generating, return the chunk
+        if (!shouldGenerate) {
+            return Optional.ofNullable((Chunk) chunkProvider.getChunk(cx, cz, ChunkStatus.???, true));
+        }
+        return Optional.ofNullable((Chunk) chunkProvider.getChunk(cx, cz, ChunkStatus.???, true));
     }
 
     @Override
     public Iterable<Chunk> getLoadedChunks() {
-        return null;
+        final AbstractChunkProvider chunkProvider = this.shadow$getChunkProvider();
+        if (chunkProvider instanceof ServerChunkProvider) {
+            final ChunkManagerAccessor chunkManager = (ChunkManagerAccessor) ((ServerChunkProvider) chunkProvider).chunkManager;
+            final List<Chunk> chunks = new ArrayList<>();
+            chunkManager.accessor$getLoadedChunksIterable().forEach(holder -> chunks.add((Chunk) holder.func_219298_c()));
+            return chunks;
+        }
+        return Collections.emptyList();
     }
-
-    @Override
-    public Path getDirectory() {
-        return null;
-    }
-
-    @Override
-    public WorldStorage getWorldStorage() {
-        return null;
-    }
-
-    @Override
-    public void triggerExplosion(Explosion explosion) {
-
-    }
-
-    @Override
-    public PortalAgent getPortalAgent() {
-        return null;
-    }
-
-    @Override
-    public boolean save() throws IOException {
-        return false;
-    }
-
-    @Override
-    public int getViewDistance() {
-        return 0;
-    }
-
-    @Override
-    public void setViewDistance(int viewDistance) {
-
-    }
-
-    @Override
-    public void resetViewDistance() {
-
-    }
-
-    @Override
-    public boolean isLoaded() {
-        return false;
-    }
-
-    @Override
-    public Context getContext() {
-        return null;
-    }
-
-    @Override
-    public void sendMessage(ChatType type, Text message) {
-
-    }
-
-    @Override
-    public MessageChannel getMessageChannel() {
-        return null;
-    }
-
-    @Override
-    public void setMessageChannel(MessageChannel channel) {
-
-    }
-
-    @Override
-    public Location getLocation(Vector3i position) {
-        return null;
-    }
-
-    @Override
-    public Location getLocation(Vector3d position) {
-        return null;
-    }
-
-    @Override
-    public ArchetypeVolume createArchetypeVolume(Vector3i min, Vector3i max, Vector3i origin) {
-        return null;
-    }
-
-    @Override
-    public Optional<UUID> getCreator(int x, int y, int z) {
-        return Optional.empty();
-    }
-
-    @Override
-    public Optional<UUID> getNotifier(int x, int y, int z) {
-        return Optional.empty();
-    }
-
-    @Override
-    public void setCreator(int x, int y, int z, @Nullable UUID uuid) {
-
-    }
-
-    @Override
-    public void setNotifier(int x, int y, int z, @Nullable UUID uuid) {
-
-    }
-
-    @Override
-    public Weather getWeather() {
-        return null;
-    }
-
-    @Override
-    public Duration getRemainingWeatherDuration() {
-        return null;
-    }
-
-    @Override
-    public Duration getRunningWeatherDuration() {
-        return null;
-    }
-
-    @Override
-    public void setWeather(Weather weather) {
-
-    }
-
-    @Override
-    public void setWeather(Weather weather, Duration duration) {
-
-    }
-
 }
