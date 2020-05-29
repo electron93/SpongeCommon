@@ -135,11 +135,6 @@ public abstract class ServerWorldMixin_API_Old extends WorldMixin_API {
     @Shadow public abstract void shadow$save(@Nullable IProgressUpdate p_217445_1_, boolean p_217445_2_, boolean p_217445_3_) throws SessionLockException;
 
     @Override
-    public boolean isLoaded() {
-        return SpongeImpl.getWorldManager().getWorld(this.shadow$getDimension().getType()) == (ServerWorld) (Object) this;
-    }
-
-    @Override
     public Path getDirectory() {
         final File worldDirectory = this.saveHandler.getWorldDirectory();
         if (worldDirectory == null) {

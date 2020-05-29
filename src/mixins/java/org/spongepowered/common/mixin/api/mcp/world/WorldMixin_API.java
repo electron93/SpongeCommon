@@ -58,37 +58,56 @@ import net.minecraft.world.chunk.ChunkStatus;
 import net.minecraft.world.chunk.IChunk;
 import net.minecraft.world.dimension.Dimension;
 import net.minecraft.world.gen.Heightmap;
-import net.minecraft.world.server.ChunkHolder;
 import net.minecraft.world.server.ServerChunkProvider;
 import net.minecraft.world.storage.MapData;
 import net.minecraft.world.storage.WorldInfo;
 import org.apache.logging.log4j.Logger;
+import org.checkerframework.checker.nullness.qual.Nullable;
 import org.spongepowered.api.Server;
 import org.spongepowered.api.block.BlockSnapshot;
+import org.spongepowered.api.effect.particle.ParticleEffect;
+import org.spongepowered.api.effect.sound.SoundType;
+import org.spongepowered.api.effect.sound.music.MusicDisc;
 import org.spongepowered.api.entity.living.player.Player;
+import org.spongepowered.api.service.context.Context;
+import org.spongepowered.api.text.BookView;
+import org.spongepowered.api.text.Text;
+import org.spongepowered.api.text.channel.MessageChannel;
+import org.spongepowered.api.text.chat.ChatType;
+import org.spongepowered.api.text.title.Title;
 import org.spongepowered.api.world.BlockChangeFlag;
 import org.spongepowered.api.world.BlockChangeFlags;
+import org.spongepowered.api.world.BoundedWorldView;
 import org.spongepowered.api.world.Location;
 import org.spongepowered.api.world.World;
 import org.spongepowered.api.world.chunk.Chunk;
+import org.spongepowered.api.world.volume.archetype.ArchetypeVolume;
+import org.spongepowered.api.world.volume.block.ImmutableBlockVolume;
+import org.spongepowered.api.world.volume.block.UnmodifiableBlockVolume;
+import org.spongepowered.api.world.weather.Weather;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.common.SpongeImpl;
 import org.spongepowered.common.accessor.world.server.ChunkManagerAccessor;
 import org.spongepowered.common.block.SpongeBlockSnapshotBuilder;
 import org.spongepowered.common.bridge.world.chunk.ChunkBridge;
 import org.spongepowered.common.event.tracking.TrackingUtil;
 import org.spongepowered.common.world.storage.SpongeChunkLayout;
+import org.spongepowered.math.vector.Vector3d;
 import org.spongepowered.math.vector.Vector3i;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
+import java.util.UUID;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 @Mixin(net.minecraft.world.World.class)
 public abstract class WorldMixin_API<W extends World<W>> implements IWorldMixin_API<W>, World<W>, IEnvironmentBlockReaderMixin_API, AutoCloseable {
@@ -245,7 +264,7 @@ public abstract class WorldMixin_API<W extends World<W>> implements IWorldMixin_
 
     @Override
     public boolean isLoaded() {
-
+        return SpongeImpl.getWorldManager().getWorld(this.shadow$getDimension().getType()) == (Object) this;
     }
 
     @Override
@@ -310,9 +329,11 @@ public abstract class WorldMixin_API<W extends World<W>> implements IWorldMixin_
         final AbstractChunkProvider chunkProvider = this.shadow$getChunkProvider();
         // If we aren't generating, return the chunk
         if (!shouldGenerate) {
-            return Optional.ofNullable((Chunk) chunkProvider.getChunk(cx, cz, ChunkStatus.???, true));
+            // TODO correct ChunkStatus?
+            return Optional.ofNullable((Chunk) chunkProvider.getChunk(cx, cz, ChunkStatus.EMPTY, true));
         }
-        return Optional.ofNullable((Chunk) chunkProvider.getChunk(cx, cz, ChunkStatus.???, true));
+        // TODO correct ChunkStatus?
+        return Optional.ofNullable((Chunk) chunkProvider.getChunk(cx, cz, ChunkStatus.FULL, true));
     }
 
     @Override
@@ -325,5 +346,212 @@ public abstract class WorldMixin_API<W extends World<W>> implements IWorldMixin_
             return chunks;
         }
         return Collections.emptyList();
+    }
+
+    // LocationCreator
+
+    @Override
+    public Location getLocation(Vector3i position) {
+        return Location.of(this, position);
+    }
+
+    @Override
+    public Location getLocation(Vector3d position) {
+        return Location.of(this, position);
+    }
+
+    // ReadableBlockVolume
+
+    @Override
+    public UnmodifiableBlockVolume<?> asUnmodifiableBlockVolume() {
+    }
+
+    @Override
+    public ImmutableBlockVolume asImmutableBlockVolume() {
+    }
+
+    @Override
+    public int getHighestYAt(int x, int z) {
+    }
+
+    // Volume
+
+    @Override
+    public BoundedWorldView<W> getView(Vector3i newMin, Vector3i newMax) {
+    }
+
+    // PhysicsAwareMutableBlockVolume
+
+    @Override
+    public boolean setBlock(int x, int y, int z, org.spongepowered.api.block.BlockState blockState, BlockChangeFlag flag) {
+        // TODO IWorldMixin_API?
+    }
+
+    // MutableBlockVolume
+
+    @Override
+    public boolean setBlock(int x, int y, int z, org.spongepowered.api.block.BlockState block) {
+
+    }
+
+    @Override
+    public boolean removeBlock(int x, int y, int z) {
+        // TODO IWorldMixin_API?
+    }
+
+    // WeatherUniverse
+
+    @Override
+    public Weather getWeather() {
+    }
+
+    @Override
+    public Duration getRemainingWeatherDuration() {
+    }
+
+    @Override
+    public Duration getRunningWeatherDuration() {
+    }
+
+    @Override
+    public void setWeather(Weather weather) {
+    }
+
+    @Override
+    public void setWeather(Weather weather, Duration duration) {
+    }
+
+    // ContextSource
+
+    @Override
+    public Context getContext() {
+
+    }
+
+    // ChatTypeMessageReceiver
+
+    @Override
+    public void sendMessage(ChatType type, Text message) {
+
+    }
+
+    // MessageReceiver
+
+    @Override
+    public MessageChannel getMessageChannel() {
+        return null;
+    }
+
+    @Override
+    public void setMessageChannel(MessageChannel channel) {
+
+    }
+
+    // TrackedVolume
+
+    @Override
+    public Optional<UUID> getCreator(int x, int y, int z) {
+    }
+
+    @Override
+    public Optional<UUID> getNotifier(int x, int y, int z) {
+    }
+
+    @Override
+    public void setCreator(int x, int y, int z, @Nullable UUID uuid) {
+
+    }
+
+    @Override
+    public void setNotifier(int x, int y, int z, @Nullable UUID uuid) {
+
+    }
+
+    // Viewer
+
+
+    @Override public void spawnParticles(ParticleEffect particleEffect, Vector3d position, int radius) {
+
+    }
+
+    @Override
+    public void playSound(SoundType sound, org.spongepowered.api.effect.sound.SoundCategory category, Vector3d position, double volume, double pitch, double minVolume) {
+
+    }
+
+    @Override
+    public void stopSounds() {
+
+    }
+
+    @Override
+    public void stopSounds(SoundType sound) {
+
+    }
+
+    @Override
+    public void stopSoundTypes(Supplier<? extends SoundType> sound) {
+
+    }
+
+    @Override
+    public void stopSounds(org.spongepowered.api.effect.sound.SoundCategory category) {
+
+    }
+
+    @Override
+    public void stopSoundCategoriess(Supplier<? extends org.spongepowered.api.effect.sound.SoundCategory> category) {
+
+    }
+
+    @Override
+    public void stopSounds(SoundType sound, org.spongepowered.api.effect.sound.SoundCategory category) {
+
+    }
+
+    @Override
+    public void stopSounds(Supplier<? extends SoundType> sound, Supplier<? extends org.spongepowered.api.effect.sound.SoundCategory> category) {
+
+    }
+
+    @Override
+    public void playMusicDisc(Vector3i position, MusicDisc musicDiscType) {
+
+    }
+
+    @Override
+    public void playMusicDisc(Vector3i position, Supplier<? extends MusicDisc> musicDiscType) {
+
+    }
+
+    @Override
+    public void stopMusicDisc(Vector3i position) {
+
+    }
+
+    @Override
+    public void sendTitle(Title title) {
+
+    }
+
+    @Override
+    public void sendBookView(BookView bookView) {
+
+    }
+
+    @Override
+    public void sendBlockChange(int x, int y, int z, org.spongepowered.api.block.BlockState state) {
+
+    }
+
+    @Override
+    public void resetBlockChange(int x, int y, int z) {
+
+    }
+
+    // ArchetypeVolumeCreator
+
+    @Override
+    public ArchetypeVolume createArchetypeVolume(Vector3i min, Vector3i max, Vector3i origin) {
     }
 }
