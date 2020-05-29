@@ -24,6 +24,9 @@
  */
 package org.spongepowered.common.mixin.api.mcp.world;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
+import com.google.common.base.Preconditions;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.material.Material;
@@ -35,6 +38,8 @@ import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.fluid.IFluidState;
 import net.minecraft.item.crafting.RecipeManager;
 import net.minecraft.network.IPacket;
+import net.minecraft.network.play.server.SPlaySoundPacket;
+import net.minecraft.network.play.server.SStopSoundPacket;
 import net.minecraft.particles.IParticleData;
 import net.minecraft.profiler.IProfiler;
 import net.minecraft.scoreboard.Scoreboard;
@@ -43,10 +48,13 @@ import net.minecraft.tags.NetworkTagManager;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.DamageSource;
 import net.minecraft.util.Direction;
+import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.SoundCategory;
 import net.minecraft.util.SoundEvent;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.registry.Registry;
 import net.minecraft.world.DifficultyInstance;
 import net.minecraft.world.GameRules;
 import net.minecraft.world.LightType;
@@ -91,8 +99,12 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.common.SpongeImpl;
 import org.spongepowered.common.accessor.world.server.ChunkManagerAccessor;
 import org.spongepowered.common.block.SpongeBlockSnapshotBuilder;
+import org.spongepowered.common.bridge.world.ServerWorldBridge;
+import org.spongepowered.common.bridge.world.ServerWorldEventHandlerBridge;
 import org.spongepowered.common.bridge.world.chunk.ChunkBridge;
+import org.spongepowered.common.effect.record.SpongeRecordType;
 import org.spongepowered.common.event.tracking.TrackingUtil;
+import org.spongepowered.common.util.VecHelper;
 import org.spongepowered.common.world.storage.SpongeChunkLayout;
 import org.spongepowered.math.vector.Vector3d;
 import org.spongepowered.math.vector.Vector3i;
@@ -469,64 +481,86 @@ public abstract class WorldMixin_API<W extends World<W>> implements IWorldMixin_
 
     // Viewer
 
-
-    @Override public void spawnParticles(ParticleEffect particleEffect, Vector3d position, int radius) {
-
+    @Override
+    public void spawnParticles(ParticleEffect particleEffect, Vector3d position, int radius) {
     }
 
     @Override
     public void playSound(SoundType sound, org.spongepowered.api.effect.sound.SoundCategory category, Vector3d position, double volume, double pitch, double minVolume) {
+        // Check if the event is registered (ie has an integer ID)
+        final ResourceLocation soundKey = (ResourceLocation) (Object) sound.getKey();
+        final Optional<SoundEvent> event = Registry.SOUND_EVENT.getValue(soundKey);
+        final SoundCategory soundCategory = (SoundCategory) (Object) category;
+        final float soundVolume = (float) Math.max(minVolume, volume);
+        if (event.isPresent()) {
+            this.shadow$playSound(null, position.getX(), position.getY(), position.getZ(), event.get(), soundCategory, soundVolume, (float) pitch);
+        } else {
+            // Otherwise send it as a custom sound
+            final double radius = volume > 1.0F ? (16.0F * volume) : 16.0D;
+            final SPlaySoundPacket packet = new SPlaySoundPacket(soundKey, soundCategory, VecHelper.toVec3d(position), soundVolume, (float) pitch);
+            this.shadow$getServer().getPlayerList().sendToAllNearExcept(null, position.getX(), position.getY(), position.getZ(), radius,
+                    this.shadow$getDimension().getType(), packet);
+        }
+    }
 
+    private void apiImpl$stopSounds(@javax.annotation.Nullable final SoundType sound, @javax.annotation.Nullable final org.spongepowered.api.effect.sound.SoundCategory category) {
+        this.shadow$getServer().getPlayerList().sendPacketToAllPlayersInDimension(new SStopSoundPacket((ResourceLocation) (Object) sound.getKey(),
+                (net.minecraft.util.SoundCategory) (Object) category), this.shadow$getDimension().getType());
     }
 
     @Override
     public void stopSounds() {
-
+        this.apiImpl$stopSounds(null, null);
     }
 
     @Override
     public void stopSounds(SoundType sound) {
-
+        this.apiImpl$stopSounds(checkNotNull(sound, "sound"), null);
     }
 
     @Override
     public void stopSoundTypes(Supplier<? extends SoundType> sound) {
-
+        this.stopSounds(sound.get());
     }
 
     @Override
     public void stopSounds(org.spongepowered.api.effect.sound.SoundCategory category) {
-
+        this.apiImpl$stopSounds(null, checkNotNull(category, "category"));
     }
 
     @Override
     public void stopSoundCategoriess(Supplier<? extends org.spongepowered.api.effect.sound.SoundCategory> category) {
-
+        this.stopSounds(category.get());
     }
 
     @Override
     public void stopSounds(SoundType sound, org.spongepowered.api.effect.sound.SoundCategory category) {
-
+        this.apiImpl$stopSounds(checkNotNull(sound, "sound"), checkNotNull(category, "category"));
     }
 
     @Override
     public void stopSounds(Supplier<? extends SoundType> sound, Supplier<? extends org.spongepowered.api.effect.sound.SoundCategory> category) {
+        this.stopSounds(sound.get(), category.get());
+    }
 
+    private void api$playRecord(final Vector3i position, @javax.annotation.Nullable final MusicDisc recordType) {
+        this.shadow$getServer().getPlayerList().sendPacketToAllPlayersInDimension(
+                SpongeRecordType.createPacket(position, recordType), this.shadow$getDimension().getType());
     }
 
     @Override
     public void playMusicDisc(Vector3i position, MusicDisc musicDiscType) {
-
+        this.api$playRecord(position, Preconditions.checkNotNull(musicDiscType, "recordType"));
     }
 
     @Override
     public void playMusicDisc(Vector3i position, Supplier<? extends MusicDisc> musicDiscType) {
-
+        this.playMusicDisc(position, musicDiscType.get());
     }
 
     @Override
     public void stopMusicDisc(Vector3i position) {
-
+        this.api$playRecord(position, null);
     }
 
     @Override

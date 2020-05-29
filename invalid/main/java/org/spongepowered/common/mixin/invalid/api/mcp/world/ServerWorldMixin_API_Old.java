@@ -24,48 +24,33 @@
  */
 package org.spongepowered.common.mixin.invalid.api.mcp.world;
 
-import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkNotNull;
-
 import com.google.common.collect.ImmutableList;
 import net.minecraft.block.Block;
 import net.minecraft.entity.player.ServerPlayerEntity;
 import net.minecraft.network.IPacket;
 import net.minecraft.network.play.server.SChunkDataPacket;
-import net.minecraft.network.play.server.SStopSoundPacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.management.PlayerChunkMap;
 import net.minecraft.server.management.PlayerChunkMapEntry;
 import net.minecraft.server.management.PlayerList;
 import net.minecraft.util.ClassInheritanceMultiMap;
 import net.minecraft.util.IProgressUpdate;
-import net.minecraft.util.ResourceLocation;
-import net.minecraft.util.SoundEvent;
-import net.minecraft.util.SoundEvents;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
-import net.minecraft.world.Explosion;
 import net.minecraft.world.NextTickListEntry;
 import net.minecraft.world.Teleporter;
-import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.server.ServerChunkProvider;
 import net.minecraft.world.server.ServerWorld;
 import net.minecraft.world.storage.SessionLockException;
 import org.apache.logging.log4j.Level;
 import org.spongepowered.api.Sponge;
-import org.spongepowered.api.block.BlockSnapshot;
 import org.spongepowered.api.block.BlockState;
 import org.spongepowered.api.block.ScheduledBlockUpdate;
 import org.spongepowered.api.effect.particle.ParticleEffect;
-import org.spongepowered.api.effect.sound.SoundCategory;
-import org.spongepowered.api.effect.sound.SoundType;
-import org.spongepowered.api.effect.sound.music.MusicDisc;
 import org.spongepowered.api.entity.Entity;
 import org.spongepowered.api.event.SpongeEventFactory;
 import org.spongepowered.api.event.entity.SpawnEntityEvent;
-import org.spongepowered.api.event.world.ExplosionEvent;
 import org.spongepowered.api.world.BlockChangeFlag;
-import org.spongepowered.api.world.BlockChangeFlags;
 import org.spongepowered.api.world.ChunkRegenerateFlag;
 import org.spongepowered.api.world.gen.TerrainGenerator;
 import org.spongepowered.api.world.storage.WorldStorage;
@@ -77,35 +62,29 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.util.PrettyPrinter;
 import org.spongepowered.common.SpongeImpl;
-import org.spongepowered.common.block.SpongeBlockSnapshotBuilder;
 import org.spongepowered.common.bridge.server.management.PlayerChunkMapBridge;
 import org.spongepowered.common.bridge.server.management.PlayerChunkMapEntryBridge;
 import org.spongepowered.common.bridge.world.ServerWorldBridge;
-import org.spongepowered.common.bridge.world.ServerWorldEventHandlerBridge;
-import org.spongepowered.common.bridge.world.storage.WorldInfoBridge;
-import org.spongepowered.common.bridge.world.chunk.ChunkBridge;
 import org.spongepowered.common.bridge.world.chunk.AbstractChunkProviderBridge;
+import org.spongepowered.common.bridge.world.chunk.ChunkBridge;
 import org.spongepowered.common.bridge.world.chunk.ServerChunkProviderBridge;
+import org.spongepowered.common.bridge.world.storage.WorldInfoBridge;
 import org.spongepowered.common.config.SpongeConfig;
 import org.spongepowered.common.config.type.WorldConfig;
 import org.spongepowered.common.effect.particle.SpongeParticleEffect;
 import org.spongepowered.common.effect.particle.SpongeParticleHelper;
-import org.spongepowered.common.effect.record.SpongeRecordType;
 import org.spongepowered.common.entity.EntityUtil;
 import org.spongepowered.common.event.tracking.IPhaseState;
 import org.spongepowered.common.event.tracking.PhaseContext;
 import org.spongepowered.common.event.tracking.PhaseTracker;
-import org.spongepowered.common.event.tracking.TrackingUtil;
-import org.spongepowered.common.event.tracking.phase.general.GeneralPhase;
 import org.spongepowered.common.event.tracking.phase.generation.GenerationPhase;
 import org.spongepowered.common.event.tracking.phase.plugin.BasicPluginContext;
 import org.spongepowered.common.event.tracking.phase.plugin.PluginPhase;
 import org.spongepowered.common.util.NonNullArrayList;
 import org.spongepowered.common.world.SpongeBlockChangeFlag;
 import org.spongepowered.math.vector.Vector3d;
-import org.spongepowered.math.vector.Vector3i;
+
 import java.io.File;
-import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -341,69 +320,6 @@ public abstract class ServerWorldMixin_API_Old extends WorldMixin_API {
     }
 
     @Override
-    public void playSound(final SoundType sound, final SoundCategory category, final Vector3d position, final double volume) {
-        this.playSound(sound, category, position, volume, 1);
-    }
-
-    @Override
-    public void playSound(final SoundType sound,  final SoundCategory category, final Vector3d position, final double volume, final double pitch) {
-        this.playSound(sound, category, position, volume, pitch, 0);
-    }
-
-    @SuppressWarnings("ConstantConditions")
-    @Override
-    public void playSound(final SoundType sound,  final SoundCategory category, final Vector3d position, final double volume, final double pitch, final double minVolume) {
-        final SoundEvent event;
-        try {
-            // Check if the event is registered (ie has an integer ID)
-            event = SoundEvents.getRegisteredSoundEvent(sound.getId());
-        } catch (IllegalStateException e) {
-            // Otherwise send it as a custom sound
-            this.eventListeners.stream()
-                .filter(listener -> listener instanceof ServerWorldEventHandlerBridge)
-                .map(listener -> (ServerWorldEventHandlerBridge) listener)
-                .forEach(listener -> {
-                    // There's no method for playing a custom sound to all, so I made one -_-
-                    listener.bridge$playCustomSoundToAllNearExcept(null,
-                        sound.getId(),
-                        (net.minecraft.util.SoundCategory) (Object) category,
-                        position.getX(), position.getY(), position.getZ(),
-                        (float) Math.max(minVolume, volume), (float) pitch);
-                });
-            return;
-        }
-
-        this.playSound(null, position.getX(), position.getY(), position.getZ(), event, (net.minecraft.util.SoundCategory) (Object) category,
-                (float) Math.max(minVolume, volume), (float) pitch);
-    }
-
-    @Override
-    public void stopSounds() {
-        this.apiImpl$stopSounds(null, null);
-    }
-
-    @Override
-    public void stopSounds(final SoundType sound) {
-        this.apiImpl$stopSounds(Preconditions.checkNotNull(sound, "sound"), null);
-    }
-
-    @Override
-    public void stopSounds(final SoundCategory category) {
-        this.apiImpl$stopSounds(null, Preconditions.checkNotNull(category, "category"));
-    }
-
-    @Override
-    public void stopSounds(final SoundType sound, final SoundCategory category) {
-        this.apiImpl$stopSounds(
-            Preconditions.checkNotNull(sound, "sound"), Preconditions.checkNotNull(category, "category"));
-    }
-
-    private void apiImpl$stopSounds(@Nullable final SoundType sound, @Nullable final SoundCategory category) {
-        this.server.getPlayerList().sendPacketToAllPlayersInDimension(new SStopSoundPacket((ResourceLocation) (Object) sound.getKey(),
-                (net.minecraft.util.SoundCategory) (Object) category), this.shadow$getDimension().getType());
-    }
-
-    @Override
     public void spawnParticles(final ParticleEffect particleEffect, final Vector3d position) {
         this.spawnParticles(particleEffect, position, Integer.MAX_VALUE);
     }
@@ -430,20 +346,6 @@ public abstract class ServerWorldMixin_API_Old extends WorldMixin_API {
         }
     }
 
-    @Override
-    public void playRecord(final Vector3i position, final MusicDisc recordType) {
-        this.api$playRecord(position, Preconditions.checkNotNull(recordType, "recordType"));
-    }
-
-    @Override
-    public void stopRecord(final Vector3i position) {
-        this.api$playRecord(position, null);
-    }
-
-    private void api$playRecord(final Vector3i position, @Nullable final MusicDisc recordType) {
-        this.server.getPlayerList().sendPacketToAllPlayersInDimension(
-                SpongeRecordType.createPacket(position, recordType), ((ServerWorldBridge) this).bridge$getDimensionId());
-    }
 
     @Override
     public Weather getWeather() {
