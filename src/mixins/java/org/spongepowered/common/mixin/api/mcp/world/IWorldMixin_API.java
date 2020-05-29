@@ -42,14 +42,7 @@ import net.minecraft.world.chunk.IChunk;
 import net.minecraft.world.storage.WorldInfo;
 import org.spongepowered.api.block.BlockState;
 import org.spongepowered.api.block.BlockType;
-import org.spongepowered.api.data.DataHolder;
-import org.spongepowered.api.data.DataTransactionResult;
-import org.spongepowered.api.data.Key;
 import org.spongepowered.api.data.persistence.DataContainer;
-import org.spongepowered.api.data.persistence.DataView;
-import org.spongepowered.api.data.persistence.InvalidDataException;
-import org.spongepowered.api.data.value.MergeFunction;
-import org.spongepowered.api.data.value.Value;
 import org.spongepowered.api.entity.Entity;
 import org.spongepowered.api.entity.EntityType;
 import org.spongepowered.api.entity.living.player.Player;
@@ -71,7 +64,6 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.math.vector.Vector3d;
 import org.spongepowered.math.vector.Vector3i;
 
-import javax.annotation.Nullable;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.Random;
@@ -79,6 +71,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
+
+import javax.annotation.Nullable;
 
 @Mixin(IWorld.class)
 public interface IWorldMixin_API<T extends ProtoWorld<T>> extends IEntityReaderMixin_API, IWorldReaderMixin_API<BoundedWorldView<T>>, IWorldGenerationReaderMixin_API, ProtoWorld<T> {
@@ -233,72 +227,6 @@ public interface IWorldMixin_API<T extends ProtoWorld<T>> extends IEntityReaderM
 
     @Override default int getHeight(final HeightType type, final int x, final int z) {
         return 0;
-    }
-
-    @Override
-    default <E> Optional<E> get(final int x, final int y, final int z, final Key<? extends Value<E>> key) {
-        return Optional.empty();
-    }
-
-    @Override
-    default <E, V extends Value<E>> Optional<V> getValue(final int x, final int y, final int z, final Key<V> key) {
-        return Optional.empty();
-    }
-
-    @Override
-    default boolean supports(final int x, final int y, final int z, final Key<?> key) {
-        return false;
-    }
-
-    @Override
-    default Set<Key<?>> getKeys(final int x, final int y, final int z) {
-        return null;
-    }
-
-    @Override
-    default Set<Value.Immutable<?>> getValues(final int x, final int y, final int z) {
-        return null;
-    }
-
-    @Override
-    default <E> DataTransactionResult offer(final int x, final int y, final int z, final Key<? extends Value<E>> key, final E value) {
-        return null;
-    }
-
-    @Override
-    default DataTransactionResult remove(final int x, final int y, final int z, final Key<?> key) {
-        return null;
-    }
-
-    @Override
-    default DataTransactionResult undo(final int x, final int y, final int z, final DataTransactionResult result) {
-        return null;
-    }
-
-    @Override
-    default DataTransactionResult copyFrom(final int xTo, final int yTo, final int zTo, final DataHolder from) {
-        return null;
-    }
-
-    @Override
-    default DataTransactionResult copyFrom(
-        final int xTo, final int yTo, final int zTo, final DataHolder from, final MergeFunction function) {
-        return null;
-    }
-
-    @Override
-    default DataTransactionResult copyFrom(final int xTo, final int yTo, final int zTo, final int xFrom, final int yFrom, final int zFrom, final MergeFunction function) {
-        return null;
-    }
-
-    @Override
-    default boolean validateRawData(final int x, final int y, final int z, final DataView container) {
-        return false;
-    }
-
-    @Override
-    default void setRawData(final int x, final int y, final int z, final DataView container) throws InvalidDataException {
-
     }
 
     @Override
