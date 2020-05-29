@@ -73,6 +73,7 @@ import org.apache.logging.log4j.Logger;
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.spongepowered.api.Server;
 import org.spongepowered.api.block.BlockSnapshot;
+import org.spongepowered.api.data.Keys;
 import org.spongepowered.api.effect.particle.ParticleEffect;
 import org.spongepowered.api.effect.sound.SoundType;
 import org.spongepowered.api.effect.sound.music.MusicDisc;
@@ -463,20 +464,22 @@ public abstract class WorldMixin_API<W extends World<W>> implements IWorldMixin_
 
     @Override
     public Optional<UUID> getCreator(int x, int y, int z) {
+        return this.get(x, y, z, Keys.CREATOR);
     }
 
     @Override
     public Optional<UUID> getNotifier(int x, int y, int z) {
+        return this.get(x, y, z, Keys.NOTIFIER);
     }
 
     @Override
     public void setCreator(int x, int y, int z, @Nullable UUID uuid) {
-
+        this.offer(x, y, z, Keys.CREATOR, uuid);
     }
 
     @Override
     public void setNotifier(int x, int y, int z, @Nullable UUID uuid) {
-
+        this.offer(x, y, z, Keys.NOTIFIER, uuid);
     }
 
     // Viewer
