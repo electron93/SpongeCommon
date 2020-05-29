@@ -53,7 +53,6 @@ import net.minecraft.util.SoundCategory;
 import net.minecraft.util.SoundEvent;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.registry.Registry;
 import net.minecraft.world.DifficultyInstance;
 import net.minecraft.world.GameRules;
@@ -84,6 +83,7 @@ import org.spongepowered.api.text.Text;
 import org.spongepowered.api.text.channel.MessageChannel;
 import org.spongepowered.api.text.chat.ChatType;
 import org.spongepowered.api.text.title.Title;
+import org.spongepowered.api.util.TemporalUnits;
 import org.spongepowered.api.world.BlockChangeFlag;
 import org.spongepowered.api.world.BlockChangeFlags;
 import org.spongepowered.api.world.BoundedWorldView;
@@ -94,6 +94,7 @@ import org.spongepowered.api.world.volume.archetype.ArchetypeVolume;
 import org.spongepowered.api.world.volume.block.ImmutableBlockVolume;
 import org.spongepowered.api.world.volume.block.UnmodifiableBlockVolume;
 import org.spongepowered.api.world.weather.Weather;
+import org.spongepowered.api.world.weather.Weathers;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -101,7 +102,6 @@ import org.spongepowered.common.SpongeImpl;
 import org.spongepowered.common.accessor.world.server.ChunkManagerAccessor;
 import org.spongepowered.common.block.SpongeBlockSnapshotBuilder;
 import org.spongepowered.common.bridge.world.ServerWorldBridge;
-import org.spongepowered.common.bridge.world.ServerWorldEventHandlerBridge;
 import org.spongepowered.common.bridge.world.chunk.ChunkBridge;
 import org.spongepowered.common.effect.record.SpongeRecordType;
 import org.spongepowered.common.event.tracking.TrackingUtil;
@@ -119,6 +119,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
@@ -416,22 +417,70 @@ public abstract class WorldMixin_API<W extends World<W>> implements IWorldMixin_
 
     @Override
     public Weather getWeather() {
+        if (this.shadow$isThundering()) {
+            return Weathers.THUNDER_STORM.get();
+        }
+        if (this.shadow$isRaining()) {
+            return Weathers.RAIN.get();
+        }
+        return Weathers.CLEAR.get();
     }
 
     @Override
     public Duration getRemainingWeatherDuration() {
+        return Duration.of(this.impl$getDurationInTicks(), TemporalUnits.MINECRAFT_TICKS);
+    }
+
+    private long impl$getDurationInTicks() {
+        if (this.shadow$isThundering()) {
+            return this.worldInfo.getThunderTime();
+        }
+        if (this.shadow$isRaining()) {
+            return this.worldInfo.getRainTime();
+        }
+        if (this.worldInfo.getClearWeatherTime() > 0) {
+            return this.worldInfo.getClearWeatherTime();
+        }
+        return Math.min(this.worldInfo.getThunderTime(), this.worldInfo.getRainTime());
     }
 
     @Override
     public Duration getRunningWeatherDuration() {
+        return Duration.of(this.worldInfo.getGameTime() - ((ServerWorldBridge) this).bridge$getWeatherStartTime(), TemporalUnits.MINECRAFT_TICKS);
     }
 
     @Override
     public void setWeather(Weather weather) {
+        this.impl$setWeather(weather, (300 + this.rand.nextInt(600)) * 20);
     }
 
     @Override
     public void setWeather(Weather weather, Duration duration) {
+        ((ServerWorldBridge) this).bridge$setPreviousWeather(this.getWeather());
+        int ticks = (int) (duration.toMillis() / TemporalUnits.MINECRAFT_TICKS.getDuration().toMillis());
+        this.impl$setWeather(weather, ticks);
+    }
+
+    public void impl$setWeather(Weather weather, int ticks) {
+        if (weather == Weathers.CLEAR.get()) {
+            this.worldInfo.setClearWeatherTime(ticks);
+            this.worldInfo.setRainTime(0);
+            this.worldInfo.setThunderTime(0);
+            this.worldInfo.setRaining(false);
+            this.worldInfo.setThundering(false);
+        } else if (weather == Weathers.RAIN.get()) {
+            this.worldInfo.setClearWeatherTime(0);
+            this.worldInfo.setRainTime(ticks);
+            this.worldInfo.setThunderTime(ticks);
+            this.worldInfo.setRaining(true);
+            this.worldInfo.setThundering(false);
+        } else if (weather == Weathers.THUNDER_STORM.get()) {
+            this.worldInfo.setClearWeatherTime(0);
+            this.worldInfo.setRainTime(ticks);
+            this.worldInfo.setThunderTime(ticks);
+            this.worldInfo.setRaining(true);
+            this.worldInfo.setThundering(true);
+        }
     }
 
     // ContextSource

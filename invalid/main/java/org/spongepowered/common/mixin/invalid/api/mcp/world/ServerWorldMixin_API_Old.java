@@ -55,8 +55,6 @@ import org.spongepowered.api.world.ChunkRegenerateFlag;
 import org.spongepowered.api.world.gen.TerrainGenerator;
 import org.spongepowered.api.world.storage.WorldStorage;
 import org.spongepowered.api.world.teleport.PortalAgent;
-import org.spongepowered.api.world.weather.Weather;
-import org.spongepowered.api.world.weather.Weathers;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -343,70 +341,6 @@ public abstract class ServerWorldMixin_API_Old extends WorldMixin_API {
             for (final IPacket<?> packet : packets) {
                 playerList.sendToAllNearExcept(null, x, y, z, radius, ((ServerWorldBridge) this).bridge$getDimensionId(), packet);
             }
-        }
-    }
-
-
-    @Override
-    public Weather getWeather() {
-        if (this.worldInfo.isThundering()) {
-            return Weathers.THUNDER_STORM;
-        }
-        if (this.worldInfo.isRaining()) {
-            return Weathers.RAIN;
-        }
-        return Weathers.CLEAR;
-    }
-
-    @Override
-    public long getRemainingDuration() {
-        final Weather weather = this.getWeather();
-        if (weather.equals(Weathers.CLEAR)) {
-            if (this.worldInfo.getClearWeatherTime() > 0) {
-                return this.worldInfo.getClearWeatherTime();
-            }
-            return Math.min(this.worldInfo.getThunderTime(), this.worldInfo.getRainTime());
-        }
-        if (weather.equals(Weathers.THUNDER_STORM)) {
-            return this.worldInfo.getThunderTime();
-        }
-        if (weather.equals(Weathers.RAIN)) {
-            return this.worldInfo.getRainTime();
-        }
-        return 0;
-    }
-
-    @Override
-    public long getRunningDuration() {
-        return this.worldInfo.getGameTime() - ((ServerWorldBridge) this).bridge$getWeatherStartTime();
-    }
-
-    @Override
-    public void setWeather(final Weather weather) {
-        this.setWeather(weather, (300 + this.rand.nextInt(600)) * 20);
-    }
-
-    @Override
-    public void setWeather(final Weather weather, final long duration) {
-        ((ServerWorldBridge) this).bridge$setPreviousWeather(this.getWeather());
-        if (weather.equals(Weathers.CLEAR)) {
-            this.worldInfo.setClearWeatherTime((int) duration);
-            this.worldInfo.setRainTime(0);
-            this.worldInfo.setThunderTime(0);
-            this.worldInfo.setRaining(false);
-            this.worldInfo.setThundering(false);
-        } else if (weather.equals(Weathers.RAIN)) {
-            this.worldInfo.setClearWeatherTime(0);
-            this.worldInfo.setRainTime((int) duration);
-            this.worldInfo.setThunderTime((int) duration);
-            this.worldInfo.setRaining(true);
-            this.worldInfo.setThundering(false);
-        } else if (weather.equals(Weathers.THUNDER_STORM)) {
-            this.worldInfo.setClearWeatherTime(0);
-            this.worldInfo.setRainTime((int) duration);
-            this.worldInfo.setThunderTime((int) duration);
-            this.worldInfo.setRaining(true);
-            this.worldInfo.setThundering(true);
         }
     }
 
