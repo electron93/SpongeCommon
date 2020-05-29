@@ -317,41 +317,4 @@ public abstract class ServerWorldMixin_API extends WorldMixin_API<org.spongepowe
         return Optional.ofNullable(raid);
     }
 
-    // InteractableVolume
-
-//    @Override
-//    public boolean hitBlock(int x, int y, int z, Direction side, GameProfile profile) {
-//        return false;
-//    }
-//
-//    @Override
-//    public boolean interactBlock(int x, int y, int z, Direction side, GameProfile profile) {
-//        return false;
-//    }
-//
-//    @Override
-//    public boolean interactBlockWith(int x, int y, int z, ItemStack itemStack, Direction side, GameProfile profile) {
-//        return false;
-//    }
-//
-//    @Override
-//    public boolean placeBlock(int x, int y, int z, org.spongepowered.api.block.BlockState block, Direction side, GameProfile profile) {
-//        return false;
-//    }
-//
-//    @Override
-//    public boolean digBlock(int x, int y, int z, GameProfile profile) {
-//        return false;
-//    }
-//
-//    @Override
-//    public boolean digBlockWith(int x, int y, int z, ItemStack itemStack, GameProfile profile) {
-//        return false;
-//    }
-//
-//    @Override
-//    public Duration getBlockDigTimeWith(int x, int y, int z, ItemStack itemStack, GameProfile profile) {
-//        return null;
-//    }
-
 }
