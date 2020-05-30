@@ -46,6 +46,7 @@ import net.minecraft.particles.IParticleData;
 import net.minecraft.profiler.IProfiler;
 import net.minecraft.scoreboard.Scoreboard;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.management.PlayerList;
 import net.minecraft.tags.NetworkTagManager;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.DamageSource;
@@ -85,12 +86,10 @@ import org.spongepowered.api.entity.living.player.Player;
 import org.spongepowered.api.service.context.Context;
 import org.spongepowered.api.text.BookView;
 import org.spongepowered.api.text.title.Title;
-import org.spongepowered.api.util.PositionOutOfBoundsException;
 import org.spongepowered.api.util.TemporalUnits;
 import org.spongepowered.api.world.BlockChangeFlag;
 import org.spongepowered.api.world.BlockChangeFlags;
 import org.spongepowered.api.world.BoundedWorldView;
-import org.spongepowered.api.world.HeightType;
 import org.spongepowered.api.world.HeightTypes;
 import org.spongepowered.api.world.Location;
 import org.spongepowered.api.world.World;
@@ -112,15 +111,10 @@ import org.spongepowered.common.block.SpongeBlockSnapshotBuilder;
 import org.spongepowered.common.bridge.world.ServerWorldBridge;
 import org.spongepowered.common.bridge.world.chunk.ChunkBridge;
 import org.spongepowered.common.effect.record.SpongeRecordType;
-import org.spongepowered.common.event.tracking.IPhaseState;
-import org.spongepowered.common.event.tracking.PhaseContext;
-import org.spongepowered.common.event.tracking.PhaseTracker;
 import org.spongepowered.common.event.tracking.TrackingUtil;
-import org.spongepowered.common.event.tracking.phase.plugin.PluginPhase;
 import org.spongepowered.common.util.BookFaker;
 import org.spongepowered.common.util.Constants;
 import org.spongepowered.common.util.VecHelper;
-import org.spongepowered.common.world.SpongeBlockChangeFlag;
 import org.spongepowered.common.world.storage.SpongeChunkLayout;
 import org.spongepowered.math.vector.Vector3d;
 import org.spongepowered.math.vector.Vector3i;
@@ -434,34 +428,6 @@ public abstract class WorldMixin_API<W extends World<W>> implements IWorldMixin_
         return IWorldMixin_API.super.getPlayers();
     }
 
-    // PhysicsAwareMutableBlockVolume
-
-    private void impl$checkBlockBounds(int x, int y, int z) {
-        if (!this.containsBlock(x, y, z)) {
-            throw new PositionOutOfBoundsException(new Vector3i(x, y, z), Constants.World.BLOCK_MIN, Constants.World.BLOCK_MAX);
-        }
-    }
-
-    @Override
-    public boolean setBlock(int x, int y, int z, org.spongepowered.api.block.BlockState blockState, BlockChangeFlag flag) {
-        // TODO can we move all of this up to IWorldWriterMixin_API?
-
-        this.impl$checkBlockBounds(x, y, z);
-        final IPhaseState<?> state = PhaseTracker.getInstance().getCurrentState();
-        final boolean isWorldGen = state.isWorldGeneration();
-        final boolean handlesOwnCompletion = state.handlesOwnStateCompletion();
-        if (!isWorldGen) {
-            Preconditions.checkArgument(flag != null, "BlockChangeFlag cannot be null!");
-        }
-        try (final PhaseContext<?> context = isWorldGen || handlesOwnCompletion ? null
-                : PluginPhase.State.BLOCK_WORKER.createPhaseContext(PhaseTracker.SERVER)) {
-            if (context != null) {
-                context.buildAndSwitch();
-            }
-            return this.shadow$setBlockState(new BlockPos(x, y, z), (BlockState) blockState, ((SpongeBlockChangeFlag) flag).getRawFlag());
-        }
-    }
-
     // WeatherUniverse
 
     @Override
@@ -576,6 +542,23 @@ public abstract class WorldMixin_API<W extends World<W>> implements IWorldMixin_
 
     @Override
     public void spawnParticles(ParticleEffect particleEffect, Vector3d position, int radius) {
+        Preconditions.checkNotNull(particleEffect, "The particle effect cannot be null!");
+        Preconditions.checkNotNull(position, "The position cannot be null");
+        Preconditions.checkArgument(radius > 0, "The radius has to be greater then zero!");
+
+        final List<IPacket<?>> packets = SpongeParticleHelper.toPackets((SpongeParticleEffect) particleEffect, position);
+
+        if (!packets.isEmpty()) {
+            final PlayerList playerList = this.shadow$getServer().getPlayerList();
+
+            final double x = position.getX();
+            final double y = position.getY();
+            final double z = position.getZ();
+
+            for (final IPacket<?> packet : packets) {
+                playerList.sendToAllNearExcept(null, x, y, z, radius, this.shadow$getDimension().getType(), packet);
+            }
+        }
     }
 
     @Override

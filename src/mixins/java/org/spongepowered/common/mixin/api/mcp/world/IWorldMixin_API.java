@@ -29,8 +29,8 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
-import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.MobEntity;
 import net.minecraft.entity.effect.LightningBoltEntity;
 import net.minecraft.entity.item.ArmorStandEntity;
@@ -56,9 +56,7 @@ import net.minecraft.world.chunk.AbstractChunkProvider;
 import net.minecraft.world.chunk.ChunkStatus;
 import net.minecraft.world.chunk.IChunk;
 import net.minecraft.world.storage.WorldInfo;
-import org.apache.commons.lang3.reflect.ConstructorUtils;
 import org.spongepowered.api.Sponge;
-import org.spongepowered.api.block.BlockState;
 import org.spongepowered.api.block.BlockType;
 import org.spongepowered.api.data.Keys;
 import org.spongepowered.api.data.persistence.DataContainer;
@@ -69,9 +67,9 @@ import org.spongepowered.api.entity.projectile.EnderPearl;
 import org.spongepowered.api.event.SpongeEventFactory;
 import org.spongepowered.api.event.entity.SpawnEntityEvent;
 import org.spongepowered.api.fluid.FluidType;
-import org.spongepowered.api.projectile.source.ProjectileSource;
 import org.spongepowered.api.scheduler.ScheduledUpdateList;
 import org.spongepowered.api.util.AABB;
+import org.spongepowered.api.util.PositionOutOfBoundsException;
 import org.spongepowered.api.world.BlockChangeFlag;
 import org.spongepowered.api.world.BoundedWorldView;
 import org.spongepowered.api.world.HeightType;
@@ -84,16 +82,17 @@ import org.spongepowered.api.world.volume.entity.ImmutableEntityVolume;
 import org.spongepowered.api.world.volume.entity.UnmodifiableEntityVolume;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
-import org.spongepowered.common.accessor.entity.LivingEntityAccessor;
 import org.spongepowered.common.accessor.entity.MobEntityAccessor;
 import org.spongepowered.common.entity.EntityUtil;
 import org.spongepowered.common.entity.projectile.UnknownProjectileSource;
 import org.spongepowered.common.event.tracking.IPhaseState;
+import org.spongepowered.common.event.tracking.PhaseContext;
 import org.spongepowered.common.event.tracking.PhaseTracker;
 import org.spongepowered.common.event.tracking.phase.plugin.BasicPluginContext;
 import org.spongepowered.common.event.tracking.phase.plugin.PluginPhase;
-import org.spongepowered.common.mixin.api.mcp.entity.EntityTypeMixin_API;
+import org.spongepowered.common.util.Constants;
 import org.spongepowered.common.util.NonNullArrayList;
+import org.spongepowered.common.world.SpongeBlockChangeFlag;
 import org.spongepowered.math.vector.Vector3d;
 import org.spongepowered.math.vector.Vector3i;
 
@@ -208,11 +207,12 @@ public interface IWorldMixin_API<T extends ProtoWorld<T>> extends IEntityReaderM
 
     // RandomProvider
 
-
     @Override
     default Random getRandom() {
         return this.shadow$getRandom();
     }
+
+    // ProtoWorld
 
     @Override
     default long getSeed() {
@@ -227,16 +227,6 @@ public interface IWorldMixin_API<T extends ProtoWorld<T>> extends IEntityReaderM
     @Override
     default WorldProperties getProperties() {
         return (WorldProperties) this.shadow$getWorldInfo();
-    }
-
-    @Override
-    default boolean setBlock(final Vector3i position, final BlockState block) {
-        throw new UnsupportedOperationException("Unfortunately, you've found an extended class of IWorld that isn't part of Sponge API: " + this.getClass());
-    }
-
-    @Override
-    default boolean setBlock(final Vector3i position, final BlockState state, final BlockChangeFlag flag) {
-        throw new UnsupportedOperationException("Unfortunately, you've found an extended class of IWorld that isn't part of Sponge API: " + this.getClass());
     }
 
     // MutableEntityVolume
@@ -386,4 +376,39 @@ public interface IWorldMixin_API<T extends ProtoWorld<T>> extends IEntityReaderM
     default ScheduledUpdateList<FluidType> getScheduledFluidUpdates() {
     }
 
+    // MutableBlockVolume
+
+    @Override
+    default boolean removeBlock(int x, int y, int z) {
+        return IWorldGenerationReaderMixin_API.super.removeBlock(x, y, z);
+    }
+
+    @Override
+    default boolean setBlock(int x, int y, int z, org.spongepowered.api.block.BlockState blockState, BlockChangeFlag flag) {
+        return IWorldGenerationReaderMixin_API.super.setBlock(x, y, z, blockState, flag);
+
+        if (!this.containsBlock(x, y, z)) {
+            throw new PositionOutOfBoundsException(new Vector3i(x, y, z), Constants.World.BLOCK_MIN, Constants.World.BLOCK_MAX);
+        }
+        final IPhaseState<?> state = PhaseTracker.getInstance().getCurrentState();
+        final boolean isWorldGen = state.isWorldGeneration();
+        final boolean handlesOwnCompletion = state.handlesOwnStateCompletion();
+        if (!isWorldGen) {
+            Preconditions.checkArgument(flag != null, "BlockChangeFlag cannot be null!");
+        }
+        try (final PhaseContext<?> context = isWorldGen || handlesOwnCompletion ? null
+                : PluginPhase.State.BLOCK_WORKER.createPhaseContext(PhaseTracker.SERVER)) {
+            if (context != null) {
+                context.buildAndSwitch();
+            }
+            return this.shadow$setBlockState(new BlockPos(x, y, z), (BlockState) blockState, ((SpongeBlockChangeFlag) flag).getRawFlag());
+        }
+    }
+
+    // ChunkVolume
+
+    @Override
+    default ProtoChunk<?> getChunk(final int x, final int y, final int z) {
+        return IWorldReaderMixin_API.super.getChunk(x, y, z);
+    }
 }

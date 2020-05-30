@@ -258,48 +258,6 @@ public abstract class ServerWorldMixin_API_Old extends WorldMixin_API {
         this.spawnParticles(particleEffect, position, Integer.MAX_VALUE);
     }
 
-    @SuppressWarnings("ResultOfMethodCallIgnored")
-    @Override
-    public void spawnParticles(final ParticleEffect particleEffect, final Vector3d position, final int radius) {
-        Preconditions.checkNotNull(particleEffect, "The particle effect cannot be null!");
-        Preconditions.checkNotNull(position, "The position cannot be null");
-        Preconditions.checkArgument(radius > 0, "The radius has to be greater then zero!");
 
-        final List<IPacket<?>> packets = SpongeParticleHelper.toPackets((SpongeParticleEffect) particleEffect, position);
-
-        if (!packets.isEmpty()) {
-            final PlayerList playerList = this.server.getPlayerList();
-
-            final double x = position.getX();
-            final double y = position.getY();
-            final double z = position.getZ();
-
-            for (final IPacket<?> packet : packets) {
-                playerList.sendToAllNearExcept(null, x, y, z, radius, ((ServerWorldBridge) this).bridge$getDimensionId(), packet);
-            }
-        }
-    }
-
-    @SuppressWarnings("deprecation")
-    @Override
-    public int getViewDistance() {
-        // TODO - Mixin 0.8 accessors
-        return ((PlayerChunkMapBridge) this.playerChunkMap).accessor$getViewDistance();
-    }
-
-    @SuppressWarnings("deprecation")
-    @Override
-    public void setViewDistance(final int viewDistance) {
-        this.playerChunkMap.setPlayerViewRadius(viewDistance);
-        final SpongeConfig<WorldConfig> configAdapter = ((WorldInfoBridge) this.getWorldInfo()).bridge$getConfigAdapter();
-        // don't use the parameter, use the field that has been clamped
-        configAdapter.getConfig().getWorld().setViewDistance(((PlayerChunkMapBridge) this.playerChunkMap).accessor$getViewDistance());
-        configAdapter.save();
-    }
-
-    @Override
-    public void resetViewDistance() {
-        this.setViewDistance(this.server.getPlayerList().getViewDistance());
-    }
 
 }
