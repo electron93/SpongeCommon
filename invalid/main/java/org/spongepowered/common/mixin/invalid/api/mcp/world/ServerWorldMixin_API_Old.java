@@ -247,27 +247,6 @@ public abstract class ServerWorldMixin_API_Old extends WorldMixin_API {
         }
     }
 
-    @SuppressWarnings("ConstantConditions")
-    @Override
-    public boolean setBlock(final int x, final int y, final int z, final BlockState blockState, final BlockChangeFlag flag) {
-        checkBlockBounds(x, y, z);
-        final IPhaseState<?> state = PhaseTracker.getInstance().getCurrentState();
-        final boolean isWorldGen = state.isWorldGeneration();
-        final boolean handlesOwnCompletion = state.handlesOwnStateCompletion();
-        if (!isWorldGen) {
-            Preconditions.checkArgument(flag != null, "BlockChangeFlag cannot be null!");
-        }
-        try (final PhaseContext<?> context = isWorldGen || handlesOwnCompletion
-                ? null
-                : PluginPhase.State.BLOCK_WORKER.createPhaseContext(PhaseTracker.SERVER)) {
-            if (context != null) {
-                context.buildAndSwitch();
-            }
-            return setBlockState(new BlockPos(x, y, z), (net.minecraft.block.BlockState) blockState, ((SpongeBlockChangeFlag) flag).getRawFlag());
-        }
-    }
-
-
     @Override
     public Collection<Entity> spawnEntities(final Iterable<? extends Entity> entities) {
         final List<Entity> entitiesToSpawn = new NonNullArrayList<>();

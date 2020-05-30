@@ -84,11 +84,8 @@ import org.spongepowered.api.effect.sound.music.MusicDisc;
 import org.spongepowered.api.entity.living.player.Player;
 import org.spongepowered.api.service.context.Context;
 import org.spongepowered.api.text.BookView;
-import org.spongepowered.api.text.Text;
-import org.spongepowered.api.text.channel.MessageChannel;
-import org.spongepowered.api.text.chat.ChatType;
-import org.spongepowered.api.text.chat.ChatTypes;
 import org.spongepowered.api.text.title.Title;
+import org.spongepowered.api.util.PositionOutOfBoundsException;
 import org.spongepowered.api.util.TemporalUnits;
 import org.spongepowered.api.world.BlockChangeFlag;
 import org.spongepowered.api.world.BlockChangeFlags;
@@ -111,9 +108,15 @@ import org.spongepowered.common.block.SpongeBlockSnapshotBuilder;
 import org.spongepowered.common.bridge.world.ServerWorldBridge;
 import org.spongepowered.common.bridge.world.chunk.ChunkBridge;
 import org.spongepowered.common.effect.record.SpongeRecordType;
+import org.spongepowered.common.event.tracking.IPhaseState;
+import org.spongepowered.common.event.tracking.PhaseContext;
+import org.spongepowered.common.event.tracking.PhaseTracker;
 import org.spongepowered.common.event.tracking.TrackingUtil;
+import org.spongepowered.common.event.tracking.phase.plugin.PluginPhase;
 import org.spongepowered.common.util.BookFaker;
+import org.spongepowered.common.util.Constants;
 import org.spongepowered.common.util.VecHelper;
+import org.spongepowered.common.world.SpongeBlockChangeFlag;
 import org.spongepowered.common.world.storage.SpongeChunkLayout;
 import org.spongepowered.math.vector.Vector3d;
 import org.spongepowered.math.vector.Vector3i;
@@ -127,7 +130,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
@@ -394,6 +396,7 @@ public abstract class WorldMixin_API<W extends World<W>> implements IWorldMixin_
 
     @Override
     public int getHighestYAt(int x, int z) {
+        return this.shadow$getHeight(Heightmap.Type.WORLD_SURFACE, x, z);
     }
 
     // Volume
@@ -404,16 +407,37 @@ public abstract class WorldMixin_API<W extends World<W>> implements IWorldMixin_
 
     // PhysicsAwareMutableBlockVolume
 
+    protected void impl$checkBlockBounds(int x, int y, int z) {
+        if (!this.containsBlock(x, y, z)) {
+            throw new PositionOutOfBoundsException(new Vector3i(x, y, z), Constants.World.BLOCK_MIN, Constants.World.BLOCK_MAX);
+        }
+    }
+
     @Override
     public boolean setBlock(int x, int y, int z, org.spongepowered.api.block.BlockState blockState, BlockChangeFlag flag) {
-        // TODO IWorldMixin_API?
+        // TODO IWorldMixin_API just returns false?
+
+        this.impl$checkBlockBounds(x, y, z);
+        final IPhaseState<?> state = PhaseTracker.getInstance().getCurrentState();
+        final boolean isWorldGen = state.isWorldGeneration();
+        final boolean handlesOwnCompletion = state.handlesOwnStateCompletion();
+        if (!isWorldGen) {
+            Preconditions.checkArgument(flag != null, "BlockChangeFlag cannot be null!");
+        }
+        try (final PhaseContext<?> context = isWorldGen || handlesOwnCompletion ? null
+                : PluginPhase.State.BLOCK_WORKER.createPhaseContext(PhaseTracker.SERVER)) {
+            if (context != null) {
+                context.buildAndSwitch();
+            }
+            return this.shadow$setBlockState(new BlockPos(x, y, z), (net.minecraft.block.BlockState) blockState, ((SpongeBlockChangeFlag) flag).getRawFlag());
+        }
     }
 
     // MutableBlockVolume
 
     @Override
     public boolean setBlock(int x, int y, int z, org.spongepowered.api.block.BlockState block) {
-
+        return this.setBlock(x, y, z, block, BlockChangeFlags.ALL);
     }
 
     @Override
