@@ -35,9 +35,11 @@ import net.minecraft.crash.CrashReportCategory;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.entity.player.ServerPlayerEntity;
 import net.minecraft.fluid.IFluidState;
 import net.minecraft.item.crafting.RecipeManager;
 import net.minecraft.network.IPacket;
+import net.minecraft.network.play.server.SChangeBlockPacket;
 import net.minecraft.network.play.server.SPlaySoundPacket;
 import net.minecraft.network.play.server.SStopSoundPacket;
 import net.minecraft.particles.IParticleData;
@@ -56,7 +58,10 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.registry.Registry;
 import net.minecraft.world.DifficultyInstance;
 import net.minecraft.world.GameRules;
+import net.minecraft.world.GameType;
+import net.minecraft.world.IWorldReader;
 import net.minecraft.world.LightType;
+import net.minecraft.world.WorldSettings;
 import net.minecraft.world.WorldType;
 import net.minecraft.world.biome.Biome;
 import net.minecraft.world.border.WorldBorder;
@@ -82,6 +87,7 @@ import org.spongepowered.api.text.BookView;
 import org.spongepowered.api.text.Text;
 import org.spongepowered.api.text.channel.MessageChannel;
 import org.spongepowered.api.text.chat.ChatType;
+import org.spongepowered.api.text.chat.ChatTypes;
 import org.spongepowered.api.text.title.Title;
 import org.spongepowered.api.util.TemporalUnits;
 import org.spongepowered.api.world.BlockChangeFlag;
@@ -99,12 +105,14 @@ import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.common.SpongeImpl;
+import org.spongepowered.common.accessor.network.play.server.SChangeBlockPacketAccessor;
 import org.spongepowered.common.accessor.world.server.ChunkManagerAccessor;
 import org.spongepowered.common.block.SpongeBlockSnapshotBuilder;
 import org.spongepowered.common.bridge.world.ServerWorldBridge;
 import org.spongepowered.common.bridge.world.chunk.ChunkBridge;
 import org.spongepowered.common.effect.record.SpongeRecordType;
 import org.spongepowered.common.event.tracking.TrackingUtil;
+import org.spongepowered.common.util.BookFaker;
 import org.spongepowered.common.util.VecHelper;
 import org.spongepowered.common.world.storage.SpongeChunkLayout;
 import org.spongepowered.math.vector.Vector3d;
@@ -485,28 +493,20 @@ public abstract class WorldMixin_API<W extends World<W>> implements IWorldMixin_
 
     // ContextSource
 
+    private Context impl$worldContext;
+
     @Override
     public Context getContext() {
-
-    }
-
-    // ChatTypeMessageReceiver
-
-    @Override
-    public void sendMessage(ChatType type, Text message) {
-
-    }
-
-    // MessageReceiver
-
-    @Override
-    public MessageChannel getMessageChannel() {
-        return null;
-    }
-
-    @Override
-    public void setMessageChannel(MessageChannel channel) {
-
+        if (this.impl$worldContext == null) {
+            WorldInfo worldInfo = this.shadow$getWorldInfo();
+            if (worldInfo == null) {
+                // We still have to consider some mods are making dummy worlds that
+                // override getWorldInfo with a null, or submit a null value.
+                worldInfo = new WorldInfo(new WorldSettings(0, GameType.NOT_SET, false, false, WorldType.DEFAULT), "sponge$dummy_World");
+            }
+            this.impl$worldContext = new Context(Context.WORLD_KEY, worldInfo.getWorldName());
+        }
+        return this.impl$worldContext;
     }
 
     // TrackedVolume
@@ -617,22 +617,41 @@ public abstract class WorldMixin_API<W extends World<W>> implements IWorldMixin_
 
     @Override
     public void sendTitle(Title title) {
+        checkNotNull(title, "title");
 
+        for (Player player : getPlayers()) {
+            player.sendTitle(title);
+        }
     }
 
     @Override
     public void sendBookView(BookView bookView) {
+        checkNotNull(bookView, "bookview");
 
+        BookFaker.fakeBookView(bookView, this.getPlayers());
     }
 
     @Override
     public void sendBlockChange(int x, int y, int z, org.spongepowered.api.block.BlockState state) {
+        checkNotNull(state, "state");
+        SChangeBlockPacket packet = new SChangeBlockPacket();
+        ((SChangeBlockPacketAccessor) packet).accessor$setPos(new BlockPos(x, y, z));
+        ((SChangeBlockPacketAccessor) packet).accessor$setState((BlockState) state);
 
+        this.shadow$getPlayers().stream()
+                .filter(ServerPlayerEntity.class::isInstance)
+                .map(ServerPlayerEntity.class::cast)
+                .forEach(p -> p.connection.sendPacket(packet));
     }
 
     @Override
     public void resetBlockChange(int x, int y, int z) {
+        SChangeBlockPacket packet = new SChangeBlockPacket((IWorldReader) this, new BlockPos(x, y, z));
 
+        this.shadow$getPlayers().stream()
+                .filter(ServerPlayerEntity.class::isInstance)
+                .map(ServerPlayerEntity.class::cast)
+                .forEach(p -> p.connection.sendPacket(packet));
     }
 
     // ArchetypeVolumeCreator

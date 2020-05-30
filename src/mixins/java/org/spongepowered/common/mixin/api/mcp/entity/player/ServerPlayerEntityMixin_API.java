@@ -90,6 +90,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.common.SpongeImpl;
 import org.spongepowered.common.accessor.network.play.server.SChangeBlockPacketAccessor;
 import org.spongepowered.common.accessor.world.border.WorldBorderAccessor;
+import org.spongepowered.common.accessor.network.play.server.SChangeBlockPacketAccessor;
 import org.spongepowered.common.bridge.advancements.AdvancementBridge;
 import org.spongepowered.common.bridge.advancements.PlayerAdvancementsBridge;
 import org.spongepowered.common.bridge.api.text.title.TitleBridge;
@@ -113,6 +114,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
@@ -199,7 +201,7 @@ public abstract class ServerPlayerEntityMixin_API extends PlayerEntityMixin_API 
             // Don't bother sending messages to fake players
             return;
         }
-        BookFaker.fakeBookView(bookView, this);
+        BookFaker.fakeBookView(bookView, Collections.singletonList(this));
     }
 
     @Override
