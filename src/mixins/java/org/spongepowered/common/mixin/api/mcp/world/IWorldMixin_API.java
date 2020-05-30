@@ -366,16 +366,6 @@ public interface IWorldMixin_API<T extends ProtoWorld<T>> extends IEntityReaderM
         return IWorldReaderMixin_API.super.getHeight(type, x, z);
     }
 
-    // UpdateableVolume
-
-    @Override
-    default ScheduledUpdateList<BlockType> getScheduledBlockUpdates() {
-    }
-
-    @Override
-    default ScheduledUpdateList<FluidType> getScheduledFluidUpdates() {
-    }
-
     // MutableBlockVolume
 
     @Override

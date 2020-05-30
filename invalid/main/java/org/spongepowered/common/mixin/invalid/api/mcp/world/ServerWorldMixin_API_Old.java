@@ -24,141 +24,35 @@
  */
 package org.spongepowered.common.mixin.invalid.api.mcp.world;
 
-import com.google.common.collect.ImmutableList;
-import net.minecraft.block.Block;
 import net.minecraft.entity.player.ServerPlayerEntity;
-import net.minecraft.network.IPacket;
 import net.minecraft.network.play.server.SChunkDataPacket;
-import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.management.PlayerChunkMap;
 import net.minecraft.server.management.PlayerChunkMapEntry;
-import net.minecraft.server.management.PlayerList;
 import net.minecraft.util.ClassInheritanceMultiMap;
-import net.minecraft.util.IProgressUpdate;
-import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
-import net.minecraft.world.NextTickListEntry;
 import net.minecraft.world.Teleporter;
 import net.minecraft.world.server.ServerChunkProvider;
 import net.minecraft.world.server.ServerWorld;
-import net.minecraft.world.storage.SessionLockException;
-import org.apache.logging.log4j.Level;
-import org.spongepowered.api.Sponge;
-import org.spongepowered.api.block.BlockState;
-import org.spongepowered.api.block.ScheduledBlockUpdate;
-import org.spongepowered.api.effect.particle.ParticleEffect;
-import org.spongepowered.api.entity.Entity;
-import org.spongepowered.api.event.SpongeEventFactory;
-import org.spongepowered.api.event.entity.SpawnEntityEvent;
-import org.spongepowered.api.world.BlockChangeFlag;
 import org.spongepowered.api.world.ChunkRegenerateFlag;
-import org.spongepowered.api.world.gen.TerrainGenerator;
-import org.spongepowered.api.world.storage.WorldStorage;
 import org.spongepowered.api.world.teleport.PortalAgent;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
-import org.spongepowered.asm.util.PrettyPrinter;
-import org.spongepowered.common.SpongeImpl;
-import org.spongepowered.common.bridge.server.management.PlayerChunkMapBridge;
 import org.spongepowered.common.bridge.server.management.PlayerChunkMapEntryBridge;
-import org.spongepowered.common.bridge.world.ServerWorldBridge;
 import org.spongepowered.common.bridge.world.chunk.AbstractChunkProviderBridge;
 import org.spongepowered.common.bridge.world.chunk.ChunkBridge;
 import org.spongepowered.common.bridge.world.chunk.ServerChunkProviderBridge;
-import org.spongepowered.common.bridge.world.storage.WorldInfoBridge;
-import org.spongepowered.common.config.SpongeConfig;
-import org.spongepowered.common.config.type.WorldConfig;
-import org.spongepowered.common.effect.particle.SpongeParticleEffect;
-import org.spongepowered.common.effect.particle.SpongeParticleHelper;
-import org.spongepowered.common.entity.EntityUtil;
-import org.spongepowered.common.event.tracking.IPhaseState;
 import org.spongepowered.common.event.tracking.PhaseContext;
 import org.spongepowered.common.event.tracking.PhaseTracker;
 import org.spongepowered.common.event.tracking.phase.generation.GenerationPhase;
-import org.spongepowered.common.event.tracking.phase.plugin.BasicPluginContext;
-import org.spongepowered.common.event.tracking.phase.plugin.PluginPhase;
-import org.spongepowered.common.util.NonNullArrayList;
-import org.spongepowered.common.world.SpongeBlockChangeFlag;
-import org.spongepowered.math.vector.Vector3d;
 
-import java.io.File;
-import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
-import java.util.TreeSet;
-import java.util.UUID;
-
-import javax.annotation.Nullable;
 
 @Mixin(ServerWorld.class)
 public abstract class ServerWorldMixin_API_Old extends WorldMixin_API {
 
-    @Shadow @Final private MinecraftServer server;
-    @Shadow @Final private Set<NextTickListEntry> pendingTickListEntriesHashSet;
-    @Shadow @Final private TreeSet<NextTickListEntry> pendingTickListEntriesTreeSet;
-    @Shadow @Final private PlayerChunkMap playerChunkMap;
     @Shadow @Final @Mutable private Teleporter worldTeleporter;
-
-    @Shadow @Nullable public abstract net.minecraft.entity.Entity getEntityFromUuid(UUID uuid);
-    @Shadow public abstract PlayerChunkMap getPlayerChunkMap();
-    @Shadow public abstract ServerChunkProvider getChunkProvider();
-    @Shadow public abstract void updateBlockTick(BlockPos pos, Block blockIn, int delay, int priority);
-    @Shadow protected abstract boolean isChunkLoaded(int x, int z, boolean allowEmpty);
-
-    @Shadow public abstract void shadow$save(@Nullable IProgressUpdate p_217445_1_, boolean p_217445_2_, boolean p_217445_3_) throws SessionLockException;
-
-    @Override
-    public Path getDirectory() {
-        final File worldDirectory = this.saveHandler.getWorldDirectory();
-        if (worldDirectory == null) {
-            new PrettyPrinter(60).add("A Server World has a null save directory!").centre().hr()
-                .add("%s : %s", "World Name", this.getName())
-                .add("%s : %s", "Dimension", this.getProperties().getDimensionType())
-                .add("Please report this to sponge developers so they may potentially fix this")
-                .trace(System.err, SpongeImpl.getLogger(), Level.ERROR);
-            return null;
-        }
-        return worldDirectory.toPath();
-    }
-
-    @Override
-    public TerrainGenerator getWorldGenerator() {
-        return ((ServerWorldBridge) this).bridge$getSpongeGenerator();
-    }
-
-    @Override
-    public ScheduledBlockUpdate addScheduledUpdate(final int x, final int y, final int z, final int priority, final int ticks) {
-        final BlockPos pos = new BlockPos(x, y, z);
-        this.updateBlockTick(pos, getBlockState(pos).getBlock(), ticks, priority);
-        final ScheduledBlockUpdate sbu = ((ServerWorldBridge) this).bridge$getScheduledBlockUpdate();
-        ((ServerWorldBridge) this).bridge$setScheduledBlockUpdate(null);
-        return sbu;
-    }
-
-    @SuppressWarnings("SuspiciousMethodCalls")
-    @Override
-    public void removeScheduledUpdate(final int x, final int y, final int z, final ScheduledBlockUpdate update) {
-        // Note: Ignores position argument
-        this.pendingTickListEntriesHashSet.remove(update);
-        this.pendingTickListEntriesTreeSet.remove(update);
-    }
-
-
-    @Override
-    public Collection<ScheduledBlockUpdate> getScheduledUpdates(final int x, final int y, final int z) {
-        final BlockPos position = new BlockPos(x, y, z);
-        final ImmutableList.Builder<ScheduledBlockUpdate> builder = ImmutableList.builder();
-        for (final NextTickListEntry sbu : this.pendingTickListEntriesTreeSet) {
-            if (sbu.position.equals(position)) {
-                builder.add((ScheduledBlockUpdate) sbu);
-            }
-        }
-        return builder.build();
-    }
 
     @SuppressWarnings("deprecation")
     @Override
@@ -244,20 +138,8 @@ public abstract class ServerWorldMixin_API_Old extends WorldMixin_API {
     }
 
     @Override
-    public WorldStorage getWorldStorage() {
-        return (WorldStorage) ((ServerWorld) (Object) this).getChunkProvider();
-    }
-
-    @Override
     public PortalAgent getPortalAgent() {
         return (PortalAgent) this.worldTeleporter;
     }
-
-    @Override
-    public void spawnParticles(final ParticleEffect particleEffect, final Vector3d position) {
-        this.spawnParticles(particleEffect, position, Integer.MAX_VALUE);
-    }
-
-
 
 }
