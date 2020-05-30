@@ -22,23 +22,25 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package org.spongepowered.common.mixin.invalid.api.mcp.world;
+package org.spongepowered.common.world;
 
-import net.minecraft.world.Teleporter;
-import net.minecraft.world.server.ServerWorld;
-import org.spongepowered.api.world.teleport.PortalAgent;
-import org.spongepowered.asm.mixin.Final;
-import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
+import net.minecraft.util.math.ChunkPos;
+import net.minecraft.world.chunk.ChunkStatus;
+import net.minecraft.world.chunk.listener.IChunkStatusListener;
 
-@Mixin(ServerWorld.class)
-public abstract class ServerWorldMixin_API_Old extends WorldMixin_API {
+import javax.annotation.Nullable;
 
-    @Shadow @Final @Mutable private Teleporter worldTeleporter;
+public class NoOpChunkStatusListener implements IChunkStatusListener {
 
     @Override
-    public PortalAgent getPortalAgent() {
-        return (PortalAgent) this.worldTeleporter;
+    public void start(ChunkPos center) {
     }
 
+    @Override
+    public void statusChanged(ChunkPos p_219508_1_, @Nullable ChunkStatus p_219508_2_) {
+    }
+
+    @Override
+    public void stop() {
+    }
 }

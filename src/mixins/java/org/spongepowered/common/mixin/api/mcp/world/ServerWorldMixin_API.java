@@ -27,6 +27,7 @@ package org.spongepowered.common.mixin.api.mcp.world;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.io.Files;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import net.minecraft.block.Block;
@@ -44,21 +45,25 @@ import net.minecraft.entity.player.ServerPlayerEntity;
 import net.minecraft.fluid.Fluid;
 import net.minecraft.item.crafting.RecipeManager;
 import net.minecraft.network.IPacket;
+import net.minecraft.network.play.server.SChunkDataPacket;
 import net.minecraft.particles.IParticleData;
 import net.minecraft.scoreboard.ServerScoreboard;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.tags.NetworkTagManager;
+import net.minecraft.util.ClassInheritanceMultiMap;
 import net.minecraft.util.DamageSource;
 import net.minecraft.util.IProgressUpdate;
 import net.minecraft.util.SoundCategory;
 import net.minecraft.util.SoundEvent;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.SectionPos;
 import net.minecraft.village.PointOfInterestManager;
 import net.minecraft.world.Explosion;
 import net.minecraft.world.NextTickListEntry;
 import net.minecraft.world.ServerTickList;
 import net.minecraft.world.Teleporter;
+import net.minecraft.world.World;
 import net.minecraft.world.WorldSettings;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.gen.feature.template.TemplateManager;
@@ -88,10 +93,13 @@ import org.spongepowered.asm.util.PrettyPrinter;
 import org.spongepowered.common.SpongeImpl;
 import org.spongepowered.common.accessor.world.raid.RaidManagerAccessor;
 import org.spongepowered.common.accessor.world.storage.SaveHandlerAccessor;
+import org.spongepowered.common.bridge.world.chunk.ServerChunkProviderBridge;
 import org.spongepowered.common.event.tracking.PhaseContext;
 import org.spongepowered.common.event.tracking.PhaseTracker;
 import org.spongepowered.common.event.tracking.phase.general.GeneralPhase;
+import org.spongepowered.common.event.tracking.phase.generation.GenerationPhase;
 import org.spongepowered.common.util.VecHelper;
+import org.spongepowered.common.world.NoOpChunkStatusListener;
 import org.spongepowered.math.vector.Vector3i;
 
 import java.io.File;
@@ -227,7 +235,88 @@ public abstract class ServerWorldMixin_API extends WorldMixin_API<org.spongepowe
 
     @Override
     public Optional<org.spongepowered.api.world.chunk.Chunk> regenerateChunk(int cx, int cy, int cz, ChunkRegenerateFlag flag) {
-        // TODO see ServerWorldMixin_API_Old
+        org.spongepowered.api.world.chunk.Chunk spongeChunk;
+        try (final PhaseContext<?> context = GenerationPhase.State.CHUNK_REGENERATING_LOAD_EXISTING.createPhaseContext(PhaseTracker.SERVER)
+                .world((net.minecraft.world.World)(Object) this)) {
+            context.buildAndSwitch();
+            spongeChunk = this.loadChunk(cx, cy, cz, false).orElse(null);
+        }
+
+        if (spongeChunk == null) {
+            if (!flag.create()) {
+                return Optional.empty();
+            }
+            // This should generate a chunk so there won't be a need to regenerate one
+            return this.loadChunk(cx, cy, cz, true);
+        }
+
+        final net.minecraft.world.chunk.Chunk chunk = (net.minecraft.world.chunk.Chunk) spongeChunk;
+        final boolean keepEntities = flag.entities();
+        try (final PhaseContext<?> context = GenerationPhase.State.CHUNK_REGENERATING.createPhaseContext(PhaseTracker.SERVER).chunk(chunk)) {
+            context.buildAndSwitch();
+            // If we reached this point, an existing chunk was found so we need to regen
+            for (final ClassInheritanceMultiMap<Entity> multiEntityList : chunk.getEntityLists()) {
+                for (final net.minecraft.entity.Entity entity : multiEntityList) {
+                    if (!keepEntities && !(entity instanceof ServerPlayerEntity)) {
+                        entity.remove();
+                    }
+                }
+            }
+
+            final ServerChunkProvider chunkProviderServer = (ServerChunkProvider) chunk.getWorld().getChunkProvider();
+            ((ServerChunkProviderBridge) chunkProviderServer).bridge$unloadChunkAndSave(chunk);
+
+            File saveFolder = Files.createTempDir();
+            // register this just in case something goes wrong
+            // normally it should be deleted at the end of this method
+            saveFolder.deleteOnExit();
+            try {
+                ServerWorld originalWorld = (ServerWorld) (Object) this;
+
+                MinecraftServer server = originalWorld.getServer();
+                SaveHandler saveHandler = new SaveHandler(saveFolder, originalWorld.getSaveHandler().getWorldDirectory().getName(), server, server.getDataFixer());
+                try (World freshWorld = new ServerWorld(server, server.getBackgroundExecutor(), saveHandler, originalWorld.getWorldInfo(),
+                        originalWorld.dimension.getType(), originalWorld.getProfiler(), new NoOpChunkStatusListener())) {
+
+                    // Also generate chunks around this one
+                    for (int z = cz - 1; z <= cz + 1; z++) {
+                        for (int x = cx - 1; x <= cx + 1; x++) {
+                            freshWorld.getChunk(x, z);
+                        }
+                    }
+
+                    Vector3i blockMin = spongeChunk.getBlockMin();
+                    Vector3i blockMax = spongeChunk.getBlockMax();
+
+                    for (int z = blockMin.getZ(); z <= blockMax.getZ(); z++) {
+                        for (int y = blockMin.getY(); y <= blockMax.getY(); y++) {
+                            for (int x = blockMin.getX(); x <= blockMax.getX(); x++) {
+                                final BlockPos pos = new BlockPos(x, y, z);
+                                chunk.setBlockState(pos, freshWorld.getBlockState(pos), false);
+                                // TODO performance? will this send client updates?
+                            }
+                        }
+                    }
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            } finally {
+                saveFolder.delete();
+            }
+
+            chunkProviderServer.chunkManager.getTrackingPlayers(new ChunkPos(cx, cz), false).forEach(player -> {
+                // We deliberately send two packets, to avoid sending a 'fullChunk' packet
+                // (a changedSectionFilter of 65535). fullChunk packets cause the client to
+                // completely overwrite its current chunk with a new chunk instance. This causes
+                // weird issues, such as making any entities in that chunk invisible (until they leave it
+                // for a new chunk)
+                // - Aaron1011
+                player.connection.sendPacket(new SChunkDataPacket(chunk, 65534));
+                player.connection.sendPacket(new SChunkDataPacket(chunk, 1));
+            });
+
+            return Optional.of((org.spongepowered.api.world.chunk.Chunk) chunk);
+        }
     }
 
     @Override
