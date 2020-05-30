@@ -225,7 +225,8 @@ public interface IWorldMixin_API<T extends ProtoWorld<T>> extends IEntityReaderM
         return null;
     }
 
-    @Override default int getHeight(final HeightType type, final int x, final int z) {
+    @Override
+    default int getHeight(final HeightType type, final int x, final int z) {
         return 0;
     }
 

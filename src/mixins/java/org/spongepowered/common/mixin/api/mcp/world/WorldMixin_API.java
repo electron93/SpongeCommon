@@ -90,6 +90,8 @@ import org.spongepowered.api.util.TemporalUnits;
 import org.spongepowered.api.world.BlockChangeFlag;
 import org.spongepowered.api.world.BlockChangeFlags;
 import org.spongepowered.api.world.BoundedWorldView;
+import org.spongepowered.api.world.HeightType;
+import org.spongepowered.api.world.HeightTypes;
 import org.spongepowered.api.world.Location;
 import org.spongepowered.api.world.World;
 import org.spongepowered.api.world.chunk.Chunk;
@@ -396,7 +398,14 @@ public abstract class WorldMixin_API<W extends World<W>> implements IWorldMixin_
 
     @Override
     public int getHighestYAt(int x, int z) {
-        return this.shadow$getHeight(Heightmap.Type.WORLD_SURFACE, x, z);
+        return this.getHeight(HeightTypes.WORLD_SURFACE.get(), x, z);
+    }
+
+    // HeightAwareVolume
+
+    public int getHeight(HeightType type, int x, int z) {
+        // TODO IWorldMixin_API just returns 0?
+        return this.shadow$getHeight((Heightmap.Type) (Object) type, x, z);
     }
 
     // Volume
