@@ -24,9 +24,24 @@
  */
 package org.spongepowered.common.mixin.api.mcp.world;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import net.minecraft.block.Block;
+import net.minecraft.block.Blocks;
+import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.MobEntity;
+import net.minecraft.entity.effect.LightningBoltEntity;
+import net.minecraft.entity.item.ArmorStandEntity;
+import net.minecraft.entity.item.EnderPearlEntity;
+import net.minecraft.entity.item.FallingBlockEntity;
+import net.minecraft.entity.item.ItemEntity;
+import net.minecraft.entity.item.PaintingEntity;
+import net.minecraft.entity.item.PaintingType;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.fluid.Fluid;
+import net.minecraft.item.ItemStack;
 import net.minecraft.particles.IParticleData;
 import net.minecraft.util.SoundEvent;
 import net.minecraft.util.math.AxisAlignedBB;
@@ -36,17 +51,25 @@ import net.minecraft.world.Difficulty;
 import net.minecraft.world.DifficultyInstance;
 import net.minecraft.world.ITickList;
 import net.minecraft.world.IWorld;
+import net.minecraft.world.World;
 import net.minecraft.world.chunk.AbstractChunkProvider;
 import net.minecraft.world.chunk.ChunkStatus;
 import net.minecraft.world.chunk.IChunk;
 import net.minecraft.world.storage.WorldInfo;
+import org.apache.commons.lang3.reflect.ConstructorUtils;
+import org.spongepowered.api.Sponge;
 import org.spongepowered.api.block.BlockState;
 import org.spongepowered.api.block.BlockType;
+import org.spongepowered.api.data.Keys;
 import org.spongepowered.api.data.persistence.DataContainer;
 import org.spongepowered.api.entity.Entity;
 import org.spongepowered.api.entity.EntityType;
 import org.spongepowered.api.entity.living.player.Player;
+import org.spongepowered.api.entity.projectile.EnderPearl;
+import org.spongepowered.api.event.SpongeEventFactory;
+import org.spongepowered.api.event.entity.SpawnEntityEvent;
 import org.spongepowered.api.fluid.FluidType;
+import org.spongepowered.api.projectile.source.ProjectileSource;
 import org.spongepowered.api.scheduler.ScheduledUpdateList;
 import org.spongepowered.api.util.AABB;
 import org.spongepowered.api.world.BlockChangeFlag;
@@ -61,10 +84,21 @@ import org.spongepowered.api.world.volume.entity.ImmutableEntityVolume;
 import org.spongepowered.api.world.volume.entity.UnmodifiableEntityVolume;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.common.accessor.entity.LivingEntityAccessor;
+import org.spongepowered.common.accessor.entity.MobEntityAccessor;
+import org.spongepowered.common.entity.EntityUtil;
+import org.spongepowered.common.entity.projectile.UnknownProjectileSource;
+import org.spongepowered.common.event.tracking.IPhaseState;
+import org.spongepowered.common.event.tracking.PhaseTracker;
+import org.spongepowered.common.event.tracking.phase.plugin.BasicPluginContext;
+import org.spongepowered.common.event.tracking.phase.plugin.PluginPhase;
+import org.spongepowered.common.mixin.api.mcp.entity.EntityTypeMixin_API;
+import org.spongepowered.common.util.NonNullArrayList;
 import org.spongepowered.math.vector.Vector3d;
 import org.spongepowered.math.vector.Vector3i;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
@@ -96,6 +130,7 @@ public interface IWorldMixin_API<T extends ProtoWorld<T>> extends IEntityReaderM
     @Shadow Stream<VoxelShape> shadow$getEmptyCollisionShapes(@Nullable net.minecraft.entity.Entity p_223439_1_, AxisAlignedBB p_223439_2_, Set<net.minecraft.entity.Entity> p_223439_3_) ;
     @Shadow boolean shadow$checkNoEntityCollision(@Nullable net.minecraft.entity.Entity p_195585_1_, VoxelShape p_195585_2_);
 
+    // MutableBiomeVolume
 
     @Override
     default boolean setBiome(final int x, final int y, final int z, final BiomeType biome) {
@@ -105,6 +140,8 @@ public interface IWorldMixin_API<T extends ProtoWorld<T>> extends IEntityReaderM
         }
         return ((ProtoChunk) iChunk).setBiome(x, y, z, biome);
     }
+
+    // Volume
 
     @Override
     default Vector3i getBlockMin() {
@@ -136,6 +173,8 @@ public interface IWorldMixin_API<T extends ProtoWorld<T>> extends IEntityReaderM
         throw new UnsupportedOperationException("Unfortunately, you've found an extended class of IWorld that isn't part of Sponge API: " + this.getClass());
     }
 
+    // ReadableEntityVolume
+
     @Override
     default UnmodifiableEntityVolume<?> asUnmodifiableEntityVolume() {
         throw new UnsupportedOperationException("Unfortunately, you've found an extended class of IWorld that isn't part of Sponge API: " + this.getClass());
@@ -155,20 +194,25 @@ public interface IWorldMixin_API<T extends ProtoWorld<T>> extends IEntityReaderM
     default Collection<? extends Player> getPlayers() {
         return IEntityReaderMixin_API.super.getPlayers();
     }
-    @Override default Collection<? extends Entity> getEntities(final AABB box, final Predicate<? super Entity> filter) {
+
+    @Override
+    default Collection<? extends Entity> getEntities(final AABB box, final Predicate<? super Entity> filter) {
         return IEntityReaderMixin_API.super.getEntities(box, filter);
     }
+
     @Override
     default <E extends Entity> Collection<? extends E> getEntities(final Class<? extends E> entityClass, final AABB box,
                                                                    @Nullable final Predicate<? super E> predicate) {
         return IEntityReaderMixin_API.super.getEntities(entityClass, box, predicate);
     }
 
-    @Override
-    default ProtoChunk<?> getChunk(final int x, final int y, final int z) {
-        return null;
-    }
+    // RandomProvider
 
+
+    @Override
+    default Random getRandom() {
+        return this.shadow$getRandom();
+    }
 
     @Override
     default long getSeed() {
@@ -195,68 +239,151 @@ public interface IWorldMixin_API<T extends ProtoWorld<T>> extends IEntityReaderM
         throw new UnsupportedOperationException("Unfortunately, you've found an extended class of IWorld that isn't part of Sponge API: " + this.getClass());
     }
 
+    // MutableEntityVolume
+
     @Override
     default Entity createEntity(final EntityType<?> type, final Vector3d position) throws IllegalArgumentException, IllegalStateException {
-        return null;
+        return this.impl$createEntity(type, position, false);
     }
 
     @Override
     default Entity createEntityNaturally(final EntityType<?> type, final Vector3d position) throws IllegalArgumentException, IllegalStateException {
-        return null;
+        return this.impl$createEntity(type, position, true);
     }
 
     @Override
     default Optional<Entity> createEntity(final DataContainer entityContainer) {
-        return Optional.empty();
     }
 
     @Override
     default Optional<Entity> createEntity(final DataContainer entityContainer, final Vector3d position) {
-        return Optional.empty();
+    }
+
+    default Entity impl$createEntity(EntityType<?> type, Vector3d position, boolean naturally) throws IllegalArgumentException, IllegalStateException {
+        checkNotNull(type, "The entity type cannot be null!");
+        checkNotNull(position, "The position cannot be null!");
+
+        if (type == net.minecraft.entity.EntityType.PLAYER) {
+            // Unable to construct these
+            throw new IllegalArgumentException("Cannot construct " + type.getKey() + " please look to using entity types correctly!");
+        }
+
+        net.minecraft.entity.Entity entity = null;
+        final double x = position.getX();
+        final double y = position.getY();
+        final double z = position.getZ();
+        // Not all entities have a single World parameter as their constructor
+        if (type == net.minecraft.entity.EntityType.LIGHTNING_BOLT) {
+            entity = new LightningBoltEntity((World) this, x, y, z, false);
+        }
+        // TODO - archetypes should solve the problem of calling the correct constructor
+        if (type == net.minecraft.entity.EntityType.ENDER_PEARL) {
+            ArmorStandEntity tempEntity = new ArmorStandEntity((World) this, x, y, z);
+            tempEntity.posY -= tempEntity.getEyeHeight();
+            entity = new EnderPearlEntity((World) this, tempEntity);
+            ((EnderPearl) entity).offer(Keys.SHOOTER, UnknownProjectileSource.UNKNOWN);
+        }
+        // Some entities need to have non-null fields (and the easiest way to
+        // set them is to use the more specialised constructor).
+        if (type == net.minecraft.entity.EntityType.FALLING_BLOCK) {
+            entity = new FallingBlockEntity((World) this, x, y, z, Blocks.SAND.getDefaultState());
+        }
+        if (type == net.minecraft.entity.EntityType.ITEM) {
+            entity = new ItemEntity((World) this, x, y, z, new ItemStack(Blocks.STONE));
+        }
+
+        if (entity == null) {
+            try {
+                entity = ((net.minecraft.entity.EntityType) type).create((World) this);
+                entity.setPosition(x, y, z);
+            } catch (Exception e) {
+                throw new RuntimeException("There was an issue attempting to construct " + type.getKey(), e);
+            }
+        }
+
+        // TODO - replace this with an actual check
+        /*
+        if (entity instanceof EntityHanging) {
+            if (((EntityHanging) entity).facingDirection == null) {
+                // TODO Some sort of detection of a valid direction?
+                // i.e scan immediate blocks for something to attach onto.
+                ((EntityHanging) entity).facingDirection = EnumFacing.NORTH;
+            }
+            if (!((EntityHanging) entity).onValidSurface()) {
+                return Optional.empty();
+            }
+        }*/
+
+        if (naturally && entity instanceof MobEntity) {
+            // Adding the default equipment
+            final DifficultyInstance difficulty = this.shadow$getDifficultyForLocation(new BlockPos(x, y, z));
+            ((MobEntityAccessor)entity).accessor$setEquipmentBasedOnDifficulty(difficulty);
+        }
+
+        if (entity instanceof PaintingEntity) {
+            // This is default when art is null when reading from NBT, could
+            // choose a random art instead?
+            ((PaintingEntity) entity).art = PaintingType.KEBAB;
+        }
+
+        return (Entity) entity;
     }
 
     @Override
     default Collection<Entity> spawnEntities(final Iterable<? extends Entity> entities) {
-        return null;
+        final List<Entity> entitiesToSpawn = new NonNullArrayList<>();
+        entities.forEach(entitiesToSpawn::add);
+        final SpawnEntityEvent.Custom event = SpongeEventFactory
+                .createSpawnEntityEventCustom(Sponge.getCauseStackManager().getCurrentCause(), entitiesToSpawn);
+        if (Sponge.getEventManager().post(event)) {
+            return ImmutableList.of();
+        }
+        for (final Entity entity : event.getEntities()) {
+            EntityUtil.processEntitySpawn(entity, Optional::empty);
+        }
+
+        final ImmutableList.Builder<Entity> builder = ImmutableList.builder();
+        for (final Entity entity : event.getEntities()) {
+            builder.add(entity);
+        }
+        return builder.build();
     }
+
+    @Override
+    default boolean spawnEntity(Entity entity) {
+        return IWorldWriterMixin_API.super.spawnEntity(entity);
+
+        Preconditions.checkNotNull(entity, "The entity cannot be null!");
+        if (PhaseTracker.isEntitySpawnInvalid(entity)) {
+            return true;
+        }
+        final PhaseTracker phaseTracker = PhaseTracker.getInstance();
+        final IPhaseState<?> state = phaseTracker.getCurrentState();
+        if (!state.alreadyCapturingEntitySpawns()) {
+            try (final BasicPluginContext context = PluginPhase.State.CUSTOM_SPAWN.createPhaseContext(PhaseTracker.SERVER)) {
+                context.buildAndSwitch();
+                phaseTracker.spawnEntityWithCause(this, entity);
+                return true;
+            }
+        }
+        return phaseTracker.spawnEntityWithCause(this, entity);
+    }
+
+    // HeightAwareVolume
 
     @Override
     default int getHeight(final HeightType type, final int x, final int z) {
-        return 0;
+        return IWorldReaderMixin_API.super.getHeight(type, x, z);
     }
 
-    @Override
-    default int getSeaLevel() {
-        return 0;
-    }
+    // UpdateableVolume
 
     @Override
     default ScheduledUpdateList<BlockType> getScheduledBlockUpdates() {
-        return null;
     }
 
     @Override
     default ScheduledUpdateList<FluidType> getScheduledFluidUpdates() {
-        return null;
     }
 
-    @Override
-    default boolean spawnEntity(final Entity entity) {
-        return false;
-    }
-
-    @Override
-    default ProtoChunk<?> getChunk(final Vector3i chunkPosition) {
-        return null;
-    }
-
-    @Override
-    default ProtoChunk<?> getChunkAtBlock(final Vector3i blockPosition) {
-        return null;
-    }
-
-    @Override
-    default ProtoChunk<?> getChunkAtBlock(final int bx, final int by, final int bz) {
-        return null;
-    }
 }

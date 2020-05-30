@@ -160,10 +160,6 @@ public abstract class ServerWorldMixin_API_Old extends WorldMixin_API {
         return builder.build();
     }
 
-    @Override
-    public Optional<Entity> getEntity(final UUID uuid) {
-        return Optional.ofNullable((Entity) this.getEntityFromUuid(uuid));
-    }
     @SuppressWarnings("deprecation")
     @Override
     public Optional<org.spongepowered.api.world.chunk.Chunk> regenerateChunk(final int cx, final int cy, final int cz, final ChunkRegenerateFlag flag) {
@@ -246,45 +242,6 @@ public abstract class ServerWorldMixin_API_Old extends WorldMixin_API {
             return Optional.of((org.spongepowered.api.world.chunk.Chunk) newChunk);
         }
     }
-
-    @Override
-    public Collection<Entity> spawnEntities(final Iterable<? extends Entity> entities) {
-        final List<Entity> entitiesToSpawn = new NonNullArrayList<>();
-        entities.forEach(entitiesToSpawn::add);
-        final SpawnEntityEvent.Custom event = SpongeEventFactory.createSpawnEntityEventCustom(Sponge.getCauseStackManager().getCurrentCause(), entitiesToSpawn);
-        if (Sponge.getEventManager().post(event)) {
-            return ImmutableList.of();
-        }
-        for (final Entity entity : event.getEntities()) {
-            EntityUtil.processEntitySpawn(entity, Optional::empty);
-        }
-
-        final ImmutableList.Builder<Entity> builder = ImmutableList.builder();
-        for (final Entity entity : event.getEntities()) {
-            builder.add(entity);
-        }
-        return builder.build();
-    }
-
-    @SuppressWarnings("ResultOfMethodCallIgnored")
-    @Override
-    public boolean spawnEntity(final Entity entity) {
-        Preconditions.checkNotNull(entity, "The entity cannot be null!");
-        if (PhaseTracker.isEntitySpawnInvalid(entity)) {
-            return true;
-        }
-        final PhaseTracker phaseTracker = PhaseTracker.getInstance();
-        final IPhaseState<?> state = phaseTracker.getCurrentState();
-        if (!state.alreadyCapturingEntitySpawns()) {
-            try (final BasicPluginContext context = PluginPhase.State.CUSTOM_SPAWN.createPhaseContext(PhaseTracker.SERVER)) {
-                context.buildAndSwitch();
-                phaseTracker.spawnEntityWithCause(this, entity);
-                return true;
-            }
-        }
-        return phaseTracker.spawnEntityWithCause(this, entity);
-    }
-
 
     @Override
     public WorldStorage getWorldStorage() {

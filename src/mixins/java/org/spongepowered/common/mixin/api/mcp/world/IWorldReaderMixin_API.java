@@ -78,6 +78,8 @@ public interface IWorldReaderMixin_API<R extends ReadableRegion<R>> extends IEnv
 
     //@formatter:on
 
+    // ReadableRegion
+
     @Override
     default Dimension getDimension() {
         return (Dimension) this.shadow$getDimension();
@@ -104,6 +106,11 @@ public interface IWorldReaderMixin_API<R extends ReadableRegion<R>> extends IEnv
     }
 
     @Override
+    default boolean containsAnyLiquids(AABB aabb) {
+
+    }
+
+    @Override
     default int getSkylightSubtracted() {
         return this.shadow$getSkylightSubtracted();
     }
@@ -124,6 +131,8 @@ public interface IWorldReaderMixin_API<R extends ReadableRegion<R>> extends IEnv
         return this.shadow$isAreaLoaded(xStart, yStart, zStart, xEnd, yEnd, zEnd);
     }
 
+    // RandomProvider
+
     /**
      * Generates a random for usage, specific cases where randoms are being stored,
      * will override this appropriately.
@@ -134,6 +143,8 @@ public interface IWorldReaderMixin_API<R extends ReadableRegion<R>> extends IEnv
     default Random getRandom() {
         return new Random();
     }
+
+    // ReadableBiomeVolume
 
     @Override
     default UnmodifiableBiomeVolume<?> asUnmodifiableBiomeVolume() {
@@ -147,11 +158,15 @@ public interface IWorldReaderMixin_API<R extends ReadableRegion<R>> extends IEnv
             "Unfortunately, you've found an extended class of IWorldReaderBase that isn't part of Sponge API");
     }
 
+    // Volume
+
     @Override
     default R getView(final Vector3i newMin, final Vector3i newMax) {
         throw new UnsupportedOperationException(
             "Unfortunately, you've found an extended class of IWorldReaderBase that isn't part of Sponge API");
     }
+
+    // ReadableEntityVolume
 
     @Override
     default UnmodifiableEntityVolume<?> asUnmodifiableEntityVolume() {
@@ -190,6 +205,8 @@ public interface IWorldReaderMixin_API<R extends ReadableRegion<R>> extends IEnv
             "Unfortunately, you've found an extended class of IWorldReaderBase that isn't part of Sponge API");
     }
 
+    // ChunkVolume
+
     @Override
     default ProtoChunk<?> getChunk(final int x, final int y, final int z) {
         return (ProtoChunk<?>) this.shadow$getChunk(x >> 4, z >> 4, ChunkStatus.EMPTY, true);
@@ -210,8 +227,11 @@ public interface IWorldReaderMixin_API<R extends ReadableRegion<R>> extends IEnv
         return this.shadow$chunkExists(position.getX() >> 4, position.getZ() >> 4);
     }
 
+    // HeightAwareVolume
+
     @Override
     default int getHeight(final HeightType type, final int x, final int z) {
         return this.shadow$getHeight((Heightmap.Type) (Object) type, x, z);
     }
+
 }

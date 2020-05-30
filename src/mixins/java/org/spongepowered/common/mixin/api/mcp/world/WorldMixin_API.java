@@ -98,6 +98,8 @@ import org.spongepowered.api.world.chunk.Chunk;
 import org.spongepowered.api.world.volume.archetype.ArchetypeVolume;
 import org.spongepowered.api.world.volume.block.ImmutableBlockVolume;
 import org.spongepowered.api.world.volume.block.UnmodifiableBlockVolume;
+import org.spongepowered.api.world.volume.entity.ImmutableEntityVolume;
+import org.spongepowered.api.world.volume.entity.UnmodifiableEntityVolume;
 import org.spongepowered.api.world.weather.Weather;
 import org.spongepowered.api.world.weather.Weathers;
 import org.spongepowered.asm.mixin.Final;
@@ -294,11 +296,6 @@ public abstract class WorldMixin_API<W extends World<W>> implements IWorldMixin_
     }
 
     @Override
-    public Collection<? extends Player> getPlayers() {
-        return IWorldMixin_API.super.getPlayers();
-    }
-
-    @Override
     @SuppressWarnings({"unchecked", "rawtypes"})
     public Optional<? extends Player> getClosestPlayer(int x, int y, int z, double distance, Predicate<? super Player> predicate) {
         final PlayerEntity player = this.shadow$getClosestPlayer(x, y, z, distance, (Predicate) predicate);
@@ -401,20 +398,44 @@ public abstract class WorldMixin_API<W extends World<W>> implements IWorldMixin_
         return this.getHeight(HeightTypes.WORLD_SURFACE.get(), x, z);
     }
 
-    // HeightAwareVolume
+    // Volume
 
-    public int getHeight(HeightType type, int x, int z) {
-        // TODO IWorldMixin_API just returns 0?
-        return this.shadow$getHeight((Heightmap.Type) (Object) type, x, z);
+    @Override
+    public Vector3i getBlockMin() {
+        return Constants.World.BLOCK_MIN;
     }
 
-    // Volume
+    @Override
+    public Vector3i getBlockMax() {
+        return Constants.World.BIOME_MAX;
+    }
+
+    @Override
+    public Vector3i getBlockSize() {
+        return Constants.World.BLOCK_SIZE;
+    }
 
     @Override
     public BoundedWorldView<W> getView(Vector3i newMin, Vector3i newMax) {
     }
 
+    // ReadableEntityVolume
+
+    @Override
+    public UnmodifiableEntityVolume<?> asUnmodifiableEntityVolume() {
+    }
+
+    @Override
+    public ImmutableEntityVolume asImmutableEntityVolume() {
+    }
+
+    @Override
+    public Collection<? extends Player> getPlayers() {
+        return IWorldMixin_API.super.getPlayers();
+    }
+
     // PhysicsAwareMutableBlockVolume
+
     private void impl$checkBlockBounds(int x, int y, int z) {
         if (!this.containsBlock(x, y, z)) {
             throw new PositionOutOfBoundsException(new Vector3i(x, y, z), Constants.World.BLOCK_MIN, Constants.World.BLOCK_MAX);

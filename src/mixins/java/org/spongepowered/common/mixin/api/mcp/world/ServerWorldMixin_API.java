@@ -317,4 +317,13 @@ public abstract class ServerWorldMixin_API extends WorldMixin_API<org.spongepowe
         return Optional.ofNullable(raid);
     }
 
+    // ReadableEntityVolume
+
+    @Override
+    public Optional<org.spongepowered.api.entity.Entity> getEntity(UUID uuid) {
+        return Optional.ofNullable((org.spongepowered.api.entity.Entity) this.shadow$getEntityByUuid(uuid));
+    }
+
+
+
 }
