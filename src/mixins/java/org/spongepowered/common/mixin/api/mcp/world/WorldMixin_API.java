@@ -415,8 +415,7 @@ public abstract class WorldMixin_API<W extends World<W>> implements IWorldMixin_
     }
 
     // PhysicsAwareMutableBlockVolume
-
-    protected void impl$checkBlockBounds(int x, int y, int z) {
+    private void impl$checkBlockBounds(int x, int y, int z) {
         if (!this.containsBlock(x, y, z)) {
             throw new PositionOutOfBoundsException(new Vector3i(x, y, z), Constants.World.BLOCK_MIN, Constants.World.BLOCK_MAX);
         }
@@ -424,7 +423,7 @@ public abstract class WorldMixin_API<W extends World<W>> implements IWorldMixin_
 
     @Override
     public boolean setBlock(int x, int y, int z, org.spongepowered.api.block.BlockState blockState, BlockChangeFlag flag) {
-        // TODO IWorldMixin_API just returns false?
+        // TODO can we move all of this up to IWorldWriterMixin_API?
 
         this.impl$checkBlockBounds(x, y, z);
         final IPhaseState<?> state = PhaseTracker.getInstance().getCurrentState();
@@ -438,20 +437,8 @@ public abstract class WorldMixin_API<W extends World<W>> implements IWorldMixin_
             if (context != null) {
                 context.buildAndSwitch();
             }
-            return this.shadow$setBlockState(new BlockPos(x, y, z), (net.minecraft.block.BlockState) blockState, ((SpongeBlockChangeFlag) flag).getRawFlag());
+            return this.shadow$setBlockState(new BlockPos(x, y, z), (BlockState) blockState, ((SpongeBlockChangeFlag) flag).getRawFlag());
         }
-    }
-
-    // MutableBlockVolume
-
-    @Override
-    public boolean setBlock(int x, int y, int z, org.spongepowered.api.block.BlockState block) {
-        return this.setBlock(x, y, z, block, BlockChangeFlags.ALL);
-    }
-
-    @Override
-    public boolean removeBlock(int x, int y, int z) {
-        // TODO IWorldMixin_API?
     }
 
     // WeatherUniverse

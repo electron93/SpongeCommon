@@ -191,11 +191,6 @@ public interface IWorldMixin_API<T extends ProtoWorld<T>> extends IEntityReaderM
     }
 
     @Override
-    default boolean setBlock(final int x, final int y, final int z, final BlockState block) {
-        throw new UnsupportedOperationException("Unfortunately, you've found an extended class of IWorld that isn't part of Sponge API: " + this.getClass());
-    }
-
-    @Override
     default boolean setBlock(final Vector3i position, final BlockState state, final BlockChangeFlag flag) {
         throw new UnsupportedOperationException("Unfortunately, you've found an extended class of IWorld that isn't part of Sponge API: " + this.getClass());
     }
@@ -246,17 +241,7 @@ public interface IWorldMixin_API<T extends ProtoWorld<T>> extends IEntityReaderM
     }
 
     @Override
-    default boolean setBlock(final int x, final int y, final int z, final BlockState state, final BlockChangeFlag flag) {
-        return false;
-    }
-
-    @Override
     default boolean spawnEntity(final Entity entity) {
-        return false;
-    }
-
-    @Override
-    default boolean removeBlock(final int x, final int y, final int z) {
         return false;
     }
 
