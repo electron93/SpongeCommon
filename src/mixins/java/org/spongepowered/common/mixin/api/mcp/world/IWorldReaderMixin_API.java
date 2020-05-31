@@ -49,6 +49,7 @@ import org.spongepowered.asm.mixin.Intrinsic;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.common.util.VecHelper;
+import org.spongepowered.math.vector.Vector3d;
 import org.spongepowered.math.vector.Vector3i;
 
 import java.util.Collection;
@@ -75,6 +76,7 @@ public interface IWorldReaderMixin_API<R extends ReadableRegion<R>> extends IEnv
     @Deprecated @Shadow boolean shadow$isAreaLoaded(BlockPos p_175707_1_, BlockPos p_175707_2_);
     @Deprecated @Shadow boolean shadow$isAreaLoaded(int p_217344_1_, int p_217344_2_, int p_217344_3_, int p_217344_4_, int p_217344_5_, int p_217344_6_);
     @Shadow net.minecraft.world.dimension.Dimension shadow$getDimension();
+    @Shadow boolean shadow$containsAnyLiquid(AxisAlignedBB bb);
 
     //@formatter:on
 
@@ -107,7 +109,9 @@ public interface IWorldReaderMixin_API<R extends ReadableRegion<R>> extends IEnv
 
     @Override
     default boolean containsAnyLiquids(AABB aabb) {
-
+        final Vector3d max = aabb.getMax();
+        final Vector3d min = aabb.getMin();
+        return this.shadow$containsAnyLiquid(new AxisAlignedBB(min.getX(), min.getY(), min.getZ(), max.getX(), max.getY(), max.getZ()));
     }
 
     @Override
