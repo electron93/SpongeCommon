@@ -109,25 +109,14 @@ import javax.annotation.Nullable;
 
 @Mixin(IWorld.class)
 public interface IWorldMixin_API<T extends ProtoWorld<T>> extends IEntityReaderMixin_API, IWorldReaderMixin_API<BoundedWorldView<T>>, IWorldGenerationReaderMixin_API, ProtoWorld<T> {
+
     @Shadow long shadow$getSeed();
-    @Shadow float shadow$getCurrentMoonPhaseFactor();
-    @Shadow float shadow$getCelestialAngle(float p_72826_1_);
-    @Shadow ITickList<Block> shadow$getPendingBlockTicks();
-    @Shadow ITickList<Fluid> shadow$getPendingFluidTicks();
     @Shadow net.minecraft.world.World shadow$getWorld();
     @Shadow WorldInfo shadow$getWorldInfo();
     @Shadow DifficultyInstance shadow$getDifficultyForLocation(BlockPos p_175649_1_);
-    @Shadow Difficulty shadow$getDifficulty();
     @Shadow AbstractChunkProvider shadow$getChunkProvider();
     @Shadow boolean shadow$chunkExists(int p_217354_1_, int p_217354_2_);
     @Shadow Random shadow$getRandom();
-    @Shadow void shadow$notifyNeighbors(BlockPos p_195592_1_, Block p_195592_2_);
-    @Shadow void shadow$playSound(@Nullable PlayerEntity p_184133_1_, BlockPos p_184133_2_, SoundEvent p_184133_3_, net.minecraft.util.SoundCategory p_184133_4_, float p_184133_5_, float p_184133_6_);
-    @Shadow void shadow$addParticle(IParticleData p_195594_1_, double p_195594_2_, double p_195594_4_, double p_195594_6_, double p_195594_8_, double p_195594_10_, double p_195594_12_);
-    @Shadow void shadow$playEvent(@Nullable PlayerEntity p_217378_1_, int p_217378_2_, BlockPos p_217378_3_, int p_217378_4_);
-    @Shadow void shadow$playEvent(int p_217379_1_, BlockPos p_217379_2_, int p_217379_3_);
-    @Shadow Stream<VoxelShape> shadow$getEmptyCollisionShapes(@Nullable net.minecraft.entity.Entity p_223439_1_, AxisAlignedBB p_223439_2_, Set<net.minecraft.entity.Entity> p_223439_3_) ;
-    @Shadow boolean shadow$checkNoEntityCollision(@Nullable net.minecraft.entity.Entity p_195585_1_, VoxelShape p_195585_2_);
 
     // MutableBiomeVolume
 
@@ -262,29 +251,30 @@ public interface IWorldMixin_API<T extends ProtoWorld<T>> extends IEntityReaderM
         final double x = position.getX();
         final double y = position.getY();
         final double z = position.getZ();
+        World thisWorld = this.shadow$getWorld();
         // Not all entities have a single World parameter as their constructor
         if (type == net.minecraft.entity.EntityType.LIGHTNING_BOLT) {
-            entity = new LightningBoltEntity((World) this, x, y, z, false);
+            entity = new LightningBoltEntity(thisWorld, x, y, z, false);
         }
         // TODO - archetypes should solve the problem of calling the correct constructor
         if (type == net.minecraft.entity.EntityType.ENDER_PEARL) {
-            ArmorStandEntity tempEntity = new ArmorStandEntity((World) this, x, y, z);
+            ArmorStandEntity tempEntity = new ArmorStandEntity(thisWorld, x, y, z);
             tempEntity.posY -= tempEntity.getEyeHeight();
-            entity = new EnderPearlEntity((World) this, tempEntity);
+            entity = new EnderPearlEntity(thisWorld, tempEntity);
             ((EnderPearl) entity).offer(Keys.SHOOTER, UnknownProjectileSource.UNKNOWN);
         }
         // Some entities need to have non-null fields (and the easiest way to
         // set them is to use the more specialised constructor).
         if (type == net.minecraft.entity.EntityType.FALLING_BLOCK) {
-            entity = new FallingBlockEntity((World) this, x, y, z, Blocks.SAND.getDefaultState());
+            entity = new FallingBlockEntity(thisWorld, x, y, z, Blocks.SAND.getDefaultState());
         }
         if (type == net.minecraft.entity.EntityType.ITEM) {
-            entity = new ItemEntity((World) this, x, y, z, new ItemStack(Blocks.STONE));
+            entity = new ItemEntity(thisWorld, x, y, z, new ItemStack(Blocks.STONE));
         }
 
         if (entity == null) {
             try {
-                entity = ((net.minecraft.entity.EntityType) type).create((World) this);
+                entity = ((net.minecraft.entity.EntityType) type).create(thisWorld);
                 entity.setPosition(x, y, z);
             } catch (Exception e) {
                 throw new RuntimeException("There was an issue attempting to construct " + type.getKey(), e);

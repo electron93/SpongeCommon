@@ -72,8 +72,6 @@ public interface IWorldReaderMixin_API<R extends ReadableRegion<R>> extends IEnv
     @Shadow int shadow$getSeaLevel();
     @Shadow boolean shadow$isCollisionBoxesEmpty(net.minecraft.entity.Entity p_195586_1_, AxisAlignedBB p_195586_2_);
     @Shadow boolean shadow$hasWater(BlockPos p_201671_1_);
-    @Deprecated @Shadow boolean shadow$isBlockLoaded(BlockPos p_175667_1_);
-    @Deprecated @Shadow boolean shadow$isAreaLoaded(BlockPos p_175707_1_, BlockPos p_175707_2_);
     @Deprecated @Shadow boolean shadow$isAreaLoaded(int p_217344_1_, int p_217344_2_, int p_217344_3_, int p_217344_4_, int p_217344_5_, int p_217344_6_);
     @Shadow net.minecraft.world.dimension.Dimension shadow$getDimension();
     @Shadow boolean shadow$containsAnyLiquid(AxisAlignedBB bb);
