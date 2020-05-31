@@ -254,10 +254,12 @@ public abstract class WorldMixin_API<W extends World<W>> implements IWorldMixin_
 
     @Override
     public UnmodifiableBlockVolume<?> asUnmodifiableBlockVolume() {
+        throw new UnsupportedOperationException("Implement me"); // TODO implement me
     }
 
     @Override
     public ImmutableBlockVolume asImmutableBlockVolume() {
+        throw new UnsupportedOperationException("Implement me"); // TODO implement me
     }
 
     @Override
@@ -284,16 +286,19 @@ public abstract class WorldMixin_API<W extends World<W>> implements IWorldMixin_
 
     @Override
     public BoundedWorldView<W> getView(Vector3i newMin, Vector3i newMax) {
+        throw new UnsupportedOperationException("Implement me"); // TODO implement me
     }
 
     // ReadableEntityVolume
 
     @Override
     public UnmodifiableEntityVolume<?> asUnmodifiableEntityVolume() {
+        throw new UnsupportedOperationException("Implement me"); // TODO implement me
     }
 
     @Override
     public ImmutableEntityVolume asImmutableEntityVolume() {
+        throw new UnsupportedOperationException("Implement me"); // TODO implement me
     }
 
     @Override
@@ -555,5 +560,6 @@ public abstract class WorldMixin_API<W extends World<W>> implements IWorldMixin_
 
     @Override
     public ArchetypeVolume createArchetypeVolume(Vector3i min, Vector3i max, Vector3i origin) {
+        throw new UnsupportedOperationException("Implement me"); // TODO implement me
     }
 }

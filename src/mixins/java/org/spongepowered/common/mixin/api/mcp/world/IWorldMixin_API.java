@@ -232,10 +232,12 @@ public interface IWorldMixin_API<T extends ProtoWorld<T>> extends IEntityReaderM
 
     @Override
     default Optional<Entity> createEntity(final DataContainer entityContainer) {
+        throw new UnsupportedOperationException("Implement me"); // TODO implement me
     }
 
     @Override
     default Optional<Entity> createEntity(final DataContainer entityContainer, final Vector3d position) {
+        throw new UnsupportedOperationException("Implement me"); // TODO implement me
     }
 
     default Entity impl$createEntity(EntityType<?> type, Vector3d position, boolean naturally) throws IllegalArgumentException, IllegalStateException {
@@ -331,7 +333,7 @@ public interface IWorldMixin_API<T extends ProtoWorld<T>> extends IEntityReaderM
 
     @Override
     default boolean spawnEntity(Entity entity) {
-        return IWorldWriterMixin_API.super.spawnEntity(entity);
+        return IWorldWriterMixin_API.super.spawnEntity(entity); // TODO is capature needed here?
 
         Preconditions.checkNotNull(entity, "The entity cannot be null!");
         if (PhaseTracker.isEntitySpawnInvalid(entity)) {
@@ -342,11 +344,11 @@ public interface IWorldMixin_API<T extends ProtoWorld<T>> extends IEntityReaderM
         if (!state.alreadyCapturingEntitySpawns()) {
             try (final BasicPluginContext context = PluginPhase.State.CUSTOM_SPAWN.createPhaseContext(PhaseTracker.SERVER)) {
                 context.buildAndSwitch();
-                phaseTracker.spawnEntityWithCause(this, entity);
+                phaseTracker.spawnEntityWithCause((org.spongepowered.api.world.World<?>) this, entity);
                 return true;
             }
         }
-        return phaseTracker.spawnEntityWithCause(this, entity);
+        return phaseTracker.spawnEntityWithCause((org.spongepowered.api.world.World<?>) this, entity);
     }
 
     // HeightAwareVolume
@@ -365,7 +367,7 @@ public interface IWorldMixin_API<T extends ProtoWorld<T>> extends IEntityReaderM
 
     @Override
     default boolean setBlock(int x, int y, int z, org.spongepowered.api.block.BlockState blockState, BlockChangeFlag flag) {
-        return IWorldGenerationReaderMixin_API.super.setBlock(x, y, z, blockState, flag);
+        return IWorldGenerationReaderMixin_API.super.setBlock(x, y, z, blockState, flag); // TODO is capture needed here?
 
         if (!this.containsBlock(x, y, z)) {
             throw new PositionOutOfBoundsException(new Vector3i(x, y, z), Constants.World.BLOCK_MIN, Constants.World.BLOCK_MAX);
