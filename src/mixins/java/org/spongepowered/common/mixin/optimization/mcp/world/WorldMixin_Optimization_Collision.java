@@ -24,13 +24,17 @@
  */
 package org.spongepowered.common.mixin.optimization.mcp.world;
 
+import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.world.World;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
 @Mixin(value = World.class, priority = 1500)
 public abstract class WorldMixin_Optimization_Collision {
+
+    @Shadow public boolean isFlammableWithin(final AxisAlignedBB bb) { return false; } // shadow
 
     @Redirect(method = "isFlammableWithin", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/World;isAreaLoaded(IIIIII)Z"))
     private boolean activeCollision$IgnoreIsAreaLoaded(final World world, final int xStart, final int yStart, final int zStart,
