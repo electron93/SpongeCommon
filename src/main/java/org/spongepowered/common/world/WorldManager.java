@@ -33,10 +33,6 @@ import com.google.common.collect.HashBiMap;
 import com.google.common.collect.MapMaker;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
-import it.unimi.dsi.fastutil.ints.Int2ReferenceLinkedOpenHashMap;
-import it.unimi.dsi.fastutil.ints.Int2ReferenceMap;
-import it.unimi.dsi.fastutil.ints.Int2ReferenceOpenHashMap;
-import it.unimi.dsi.fastutil.ints.IntIterator;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
@@ -113,7 +109,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.OptionalInt;
 import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -129,13 +124,13 @@ public final class WorldManager {
     private static final DirectoryStream.Filter<Path> LEVEL_AND_SPONGE =
             entry -> Files.isDirectory(entry) && Files.exists(entry.resolve("level.dat")) && Files.exists(entry.resolve("level_sponge.dat"));
 
-    private static final Int2ReferenceMap<DimensionType> dimensionTypeByTypeId = new Int2ReferenceOpenHashMap<>(3);
-    private static final Int2ReferenceMap<DimensionType> dimensionTypeByDimensionId = new Int2ReferenceOpenHashMap<>(3);
+    private static final Int2ObjectMap<DimensionType> dimensionTypeByTypeId = new Int2ObjectOpenHashMap<>(3);
+    private static final Int2ObjectMap<DimensionType> dimensionTypeByDimensionId = new Int2ObjectOpenHashMap<>(3);
     private static final Int2ObjectMap<Path> dimensionPathByDimensionId = new Int2ObjectOpenHashMap<>(3);
     private static final Int2ObjectOpenHashMap<WorldServer> worldByDimensionId = new Int2ObjectOpenHashMap<>(3);
     private static final Map<String, WorldProperties> worldPropertiesByFolderName = new HashMap<>(3);
     private static final Map<UUID, WorldProperties> worldPropertiesByWorldUuid =  new HashMap<>(3);
-    private static final Int2ObjectMap<String> worldFolderByDimensionId = new Int2ObjectOpenHashMap<>();
+    private static final Map<Integer, String> worldFolderByDimensionId = new HashMap<>();
     private static final BiMap<String, UUID> worldUuidByFolderName =  HashBiMap.create(3);
     private static final IntSet usedDimensionIds = new IntOpenHashSet();
     private static final Map<WorldServer, WorldServer> weakWorldByWorld = new MapMaker().weakKeys().weakValues().concurrencyLevel(1).makeMap();
@@ -172,30 +167,33 @@ public final class WorldManager {
 
     public static void registerDimensionType(final DimensionType type) {
         checkNotNull(type);
-        final OptionalInt optNextDimensionTypeId = getNextFreeDimensionTypeId();
+        final Optional<Integer> optNextDimensionTypeId = getNextFreeDimensionTypeId();
         optNextDimensionTypeId.ifPresent(integer -> registerDimensionType(integer, type));
 
     }
 
     public static void registerDimensionType(final int dimensionTypeId, final DimensionType type) {
         checkNotNull(type);
-        dimensionTypeByTypeId.putIfAbsent(dimensionTypeId, type);
+        if (dimensionTypeByTypeId.containsKey(dimensionTypeId)) {
+            return;
+        }
+
+        dimensionTypeByTypeId.put(dimensionTypeId, type);
     }
 
-    private static OptionalInt getNextFreeDimensionTypeId() {
+    private static Optional<Integer> getNextFreeDimensionTypeId() {
         Integer highestDimensionTypeId = null;
 
-        for (IntIterator iterator = dimensionTypeByTypeId.keySet().iterator(); iterator.hasNext();) {
-            final int dimensionTypeId = iterator.nextInt();
+        for (final Integer dimensionTypeId : dimensionTypeByTypeId.keySet()) {
             if (highestDimensionTypeId == null || highestDimensionTypeId < dimensionTypeId) {
                 highestDimensionTypeId = dimensionTypeId;
             }
         }
 
         if (highestDimensionTypeId != null && highestDimensionTypeId < 127) {
-            return OptionalInt.of(++highestDimensionTypeId);
+            return Optional.of(++highestDimensionTypeId);
         }
-        return OptionalInt.empty();
+        return Optional.empty();
     }
 
     public static Integer getNextFreeDimensionId() {
@@ -220,20 +218,22 @@ public final class WorldManager {
             return;
         }
 
-        final DimensionType previous = dimensionTypeByDimensionId.putIfAbsent(dimensionId, type);
-        if (previous != null) {
+        if (dimensionTypeByDimensionId.containsKey(dimensionId)) {
             return;
         }
+
+        dimensionTypeByDimensionId.put(dimensionId, type);
         if (dimensionId >= 0) {
             usedDimensionIds.add(dimensionId);
         }
     }
 
     public static void unregisterDimension(final int dimensionId) {
-        final DimensionType previous = dimensionTypeByDimensionId.remove(dimensionId);
-        if (previous == null) {
+        if (!dimensionTypeByDimensionId.containsKey(dimensionId))
+        {
             throw new IllegalArgumentException("Failed to unregister dimension [" + dimensionId + "] as it is not registered!");
         }
+        dimensionTypeByDimensionId.remove(dimensionId);
     }
 
     private static void registerVanillaDimensionPaths(final Path savePath) {
@@ -276,9 +276,9 @@ public final class WorldManager {
     }
 
     public static int[] getRegisteredDimensionIdsFor(final DimensionType type) {
-        return dimensionTypeByDimensionId.int2ReferenceEntrySet().stream()
+        return dimensionTypeByDimensionId.int2ObjectEntrySet().stream()
                 .filter(entry -> entry.getValue() == type)
-                .mapToInt(Int2ReferenceMap.Entry::getIntKey)
+                .mapToInt(Int2ObjectMap.Entry::getIntKey)
                 .toArray();
     }
 
@@ -295,10 +295,10 @@ public final class WorldManager {
         return dimensionTypeByDimensionId.containsKey(dimensionId);
     }
 
-    private static Int2ReferenceMap<DimensionType> sortedDimensionMap() {
-        final Int2ReferenceMap<DimensionType> copy = new Int2ReferenceOpenHashMap<>(dimensionTypeByDimensionId);
+    private static Map<Integer, DimensionType> sortedDimensionMap() {
+        final Int2ObjectMap<DimensionType> copy = new Int2ObjectOpenHashMap<>(dimensionTypeByDimensionId);
 
-        final Int2ReferenceMap<DimensionType> newMap = new Int2ReferenceLinkedOpenHashMap<>();
+        final HashMap<Integer, DimensionType> newMap = new LinkedHashMap<>();
 
         newMap.put(0, copy.remove(0));
 
@@ -725,9 +725,9 @@ public final class WorldManager {
 
         registerExistingSpongeDimensions(currentSavesDir);
 
-        for (final Int2ReferenceMap.Entry<DimensionType> entry: sortedDimensionMap().int2ReferenceEntrySet()) {
+        for (final Map.Entry<Integer, DimensionType> entry: sortedDimensionMap().entrySet()) {
 
-            final int dimensionId = entry.getIntKey();
+            final int dimensionId = entry.getKey();
             final DimensionType dimensionType = entry.getValue();
             final org.spongepowered.api.world.DimensionType apiDimensionType = (org.spongepowered.api.world.DimensionType) (Object) dimensionType;
             // Skip all worlds besides dimension 0 if multi-world is disabled
@@ -1323,12 +1323,7 @@ public final class WorldManager {
         lastUsedDimensionId = 0;
 
         if (compound == null) {
-            for (IntIterator iterator = dimensionTypeByDimensionId.keySet().iterator(); iterator.hasNext();) {
-                final int dimensionId = iterator.nextInt();
-                if (dimensionId >= 0) {
-                    usedDimensionIds.add(dimensionId);
-                }
-            }
+            dimensionTypeByDimensionId.keySet().stream().filter(dimensionId -> dimensionId >= 0).forEach(usedDimensionIds::add);
         } else {
             for (final int id : compound.getIntArray(Constants.Forge.USED_DIMENSION_IDS)) {
                 usedDimensionIds.add(id);

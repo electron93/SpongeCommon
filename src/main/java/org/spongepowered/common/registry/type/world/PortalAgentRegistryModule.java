@@ -42,7 +42,6 @@ import org.spongepowered.common.world.SpongePortalAgentType;
 
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.IdentityHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -55,7 +54,7 @@ public final class PortalAgentRegistryModule implements SpongeAdditionalCatalogR
 
     @RegisterCatalog(PortalAgentTypes.class)
     private final Map<String, PortalAgentType> portalAgentTypeMappings = new HashMap<>();
-    private final Map<Class<? extends PortalAgent>, PortalAgentType> portalAgentClassToTypeMappings = new IdentityHashMap<>();
+    private final Map<Class<? extends PortalAgent>, PortalAgentType> portalAgentClassToTypeMappings = new HashMap<>();
 
     @Override
     public Optional<PortalAgentType> getById(String id) {

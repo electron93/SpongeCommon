@@ -36,7 +36,6 @@ import org.spongepowered.common.item.inventory.lens.impl.collections.SlotCollect
 import org.spongepowered.common.item.inventory.lens.impl.comp.OrderedInventoryLensImpl;
 
 import java.util.HashMap;
-import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -46,7 +45,7 @@ public class ReusableLens<T extends Lens> {
 
     // InventoryAdapterClass -> LensClass -> Size -> ReusableLens
     private static Map<Class<? extends InventoryAdapter>, Map<Class<? extends Lens>, Int2ObjectMap<ReusableLens>>>
-            reusableLenses = new IdentityHashMap<>();
+            reusableLenses = new HashMap<>();
 
     private final SlotProvider slots;
     private final T lens;
@@ -65,7 +64,7 @@ public class ReusableLens<T extends Lens> {
     public static <T extends Lens> ReusableLens<T> getLens(Class<T> lensType, InventoryAdapter adapter,
             Supplier<SlotProvider> slots, Function<SlotProvider, T> lens) {
         Map<Class<? extends Lens>, Int2ObjectMap<ReusableLens>>
-                adapterLenses = reusableLenses.computeIfAbsent(adapter.getClass(), k -> new IdentityHashMap<>());
+                adapterLenses = reusableLenses.computeIfAbsent(adapter.getClass(), k -> new HashMap<>());
         Int2ObjectMap<ReusableLens> lenses = adapterLenses.computeIfAbsent(lensType, k -> new Int2ObjectOpenHashMap<>());
         return lenses.computeIfAbsent(adapter.bridge$getFabric().fabric$getSize(), k -> {
             SlotProvider sl = slots.get();

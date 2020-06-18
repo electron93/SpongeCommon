@@ -182,7 +182,6 @@ import org.spongepowered.common.world.SpongeLocatableBlockBuilder;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -725,7 +724,7 @@ public class SpongeCommonEventFactory {
             }
             Sponge.getCauseStackManager().pushCause(locatable);
 
-            final Map<Direction, BlockState> neighbors = new EnumMap<>(Direction.class);
+            final Map<Direction, BlockState> neighbors = new HashMap<>();
             for (final EnumFacing notificationSide : notifiedSides) {
                 final BlockPos offset = sourcePos.offset(notificationSide);
                 final Direction direction = DirectionFacingProvider.getInstance().getKey(notificationSide).get();

@@ -84,7 +84,6 @@ import org.spongepowered.common.world.gen.InternalPopulatorTypes;
 import org.spongepowered.common.world.gen.SpongePopulatorType;
 
 import java.util.Collection;
-import java.util.IdentityHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -96,7 +95,7 @@ public final class PopulatorTypeRegistryModule implements AdditionalCatalogRegis
         return Holder.INSTANCE;
     }
 
-    public final Map<Class<?>, PopulatorType> populatorClassToTypeMappings = new IdentityHashMap<>();
+    public final Map<Class<?>, PopulatorType> populatorClassToTypeMappings = Maps.newHashMap();
 
     @RegisterCatalog(PopulatorTypes.class)
     protected final Map<String, PopulatorType> populatorTypeMappings = Maps.newHashMap();

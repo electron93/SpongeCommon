@@ -32,7 +32,6 @@ import org.spongepowered.common.SpongeImplHooks;
 import org.spongepowered.common.bridge.world.ForgeITeleporterBridge;
 
 import java.util.HashMap;
-import java.util.IdentityHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -40,7 +39,7 @@ import java.util.Optional;
 // This is a giant hack to allow passing a Forge ITeleporter to the API.
 // TODO: https://github.com/SpongePowered/SpongeForge/issues/2266
 public class VirtualPortalAgent implements PortalAgent {
-    private static final Map<Class<? extends ForgeITeleporterBridge>, PortalAgentType> TYPES = new IdentityHashMap<>();
+    private static final Map<Class<? extends ForgeITeleporterBridge>, PortalAgentType> TYPES = new HashMap<>();
     private final ForgeITeleporterBridge teleporter;
     private final PortalAgentType type;
 

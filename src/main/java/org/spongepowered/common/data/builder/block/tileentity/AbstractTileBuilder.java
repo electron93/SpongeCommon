@@ -64,7 +64,6 @@ import org.spongepowered.api.world.World;
 import org.spongepowered.common.registry.type.block.TileEntityTypeRegistryModule;
 import org.spongepowered.common.util.Constants;
 
-import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -76,7 +75,7 @@ import java.util.Optional;
  */
 public abstract class AbstractTileBuilder<T extends org.spongepowered.api.block.tileentity.TileEntity> extends AbstractDataBuilder<T> implements DataBuilder<T> {
 
-    private static final Map<Class<? extends TileEntity>, BlockType> classToTypeMap = new IdentityHashMap<>();
+    private static final Map<Class<? extends TileEntity>, BlockType> classToTypeMap = Maps.newHashMap();
 
     protected AbstractTileBuilder(Class<T> clazz, int version) {
         super(clazz, version);

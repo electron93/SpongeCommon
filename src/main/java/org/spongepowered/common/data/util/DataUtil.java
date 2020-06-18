@@ -33,7 +33,6 @@ import com.flowpowered.math.vector.Vector3i;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.reflect.TypeToken;
-import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.util.datafix.DataFixer;
@@ -581,9 +580,10 @@ public final class DataUtil {
                 // Re-attempt to deserialize custom data
                 final SerializedDataTransaction transaction = deserializeManipulatorList(builder.build());
                 final List<DataManipulator<?, ?>> manipulators = transaction.deserializedManipulators;
-                final Set<Class<? extends DataManipulator<?, ?>>> classesLoaded = new ReferenceOpenHashSet<>();
+                final List<Class<? extends DataManipulator<?, ?>>> classesLoaded = new ArrayList<>();
                 for (final DataManipulator<?, ?> manipulator : manipulators) {
-                    if (classesLoaded.add((Class<? extends DataManipulator<?, ?>>) manipulator.getClass())) {
+                    if (!classesLoaded.contains(manipulator.getClass())) {
+                        classesLoaded.add((Class<? extends DataManipulator<?, ?>>) manipulator.getClass());
                         // If for any reason a failed data was not deserialized, but
                         // there already exists new data, we just simply want to
                         // ignore the failed data for removal.

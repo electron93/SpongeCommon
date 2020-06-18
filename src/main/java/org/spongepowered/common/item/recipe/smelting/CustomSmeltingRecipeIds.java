@@ -26,8 +26,6 @@ package org.spongepowered.common.item.recipe.smelting;
 
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
-import it.unimi.dsi.fastutil.objects.Reference2IntMap;
-import it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap;
 import org.spongepowered.api.Sponge;
 import org.spongepowered.api.item.recipe.smelting.SmeltingRecipe;
 import org.spongepowered.api.plugin.PluginContainer;
@@ -38,7 +36,7 @@ import java.util.Map;
 public final class CustomSmeltingRecipeIds {
 
     private static final Map<SmeltingRecipe, String> ids = new IdentityHashMap<>();
-    private static final Reference2IntMap<Class<?>> counters = new Reference2IntOpenHashMap<>();
+    private static final Object2IntMap<Class<?>> counters = new Object2IntOpenHashMap<>();
 
     public static String getDefaultId(SmeltingRecipe recipe) {
         return ids.computeIfAbsent(recipe, CustomSmeltingRecipeIds::loadDefaultId);

@@ -27,8 +27,6 @@ package org.spongepowered.common.registry.type.entity;
 import static org.spongepowered.common.data.util.DataUtil.getData;
 
 import com.google.common.collect.Maps;
-import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
-import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import net.minecraft.entity.passive.EntityHorse;
 import org.spongepowered.api.data.DataView;
 import org.spongepowered.api.data.key.Keys;
@@ -50,7 +48,7 @@ public class HorseStyleRegistryModule extends AbstractPrefixAlternateCatalogType
     public static final SpongeHorseStyle BLACK_DOTS = new SpongeHorseStyle(4, "minecraft:black_dots", "BLACK_DOTS");
     public static final SpongeHorseStyle NONE = new SpongeHorseStyle(0, "minecraft:none", "NONE");
 
-    public static final Int2ObjectMap<HorseStyle> HORSE_STYLE_IDMAP = new Int2ObjectOpenHashMap<>();
+    public static final Map<Integer, HorseStyle> HORSE_STYLE_IDMAP = Maps.newHashMap();
     private static final HorseStyleRegistryModule INSTANCE = new HorseStyleRegistryModule();
 
     private HorseStyleRegistryModule() {

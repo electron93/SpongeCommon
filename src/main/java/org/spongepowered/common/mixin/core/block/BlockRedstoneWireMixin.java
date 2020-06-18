@@ -44,8 +44,6 @@ import org.spongepowered.common.data.manipulator.immutable.block.ImmutableSponge
 import org.spongepowered.common.data.manipulator.immutable.block.ImmutableSpongeRedstonePoweredData;
 import org.spongepowered.common.data.manipulator.immutable.block.ImmutableSpongeWireAttachmentData;
 
-import java.util.EnumMap;
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -99,7 +97,7 @@ public abstract class BlockRedstoneWireMixin extends BlockMixin {
     }
 
     private ImmutableConnectedDirectionData impl$getConnectedDirectionData(final IBlockState blockState) {
-        final Set<Direction> directions = EnumSet.noneOf(Direction.class);
+        final Set<Direction> directions = new HashSet<>();
         final IStringSerializable north = blockState.getValue(BlockRedstoneWire.NORTH);
         final IStringSerializable east = blockState.getValue(BlockRedstoneWire.EAST);
         final IStringSerializable west = blockState.getValue(BlockRedstoneWire.WEST);
@@ -121,7 +119,7 @@ public abstract class BlockRedstoneWireMixin extends BlockMixin {
 
     @SuppressWarnings("ConstantConditions")
     private ImmutableWireAttachmentData impl$getWireAttachmentData(final IBlockState blockState) {
-        final Map<Direction, WireAttachmentType> data = new EnumMap<>(Direction.class);
+        final Map<Direction, WireAttachmentType> data = new HashMap<>();
         data.put(Direction.NORTH, (WireAttachmentType) (Object) blockState.getValue(BlockRedstoneWire.NORTH));
         data.put(Direction.SOUTH, (WireAttachmentType) (Object) blockState.getValue(BlockRedstoneWire.SOUTH));
         data.put(Direction.EAST, (WireAttachmentType) (Object) blockState.getValue(BlockRedstoneWire.EAST));

@@ -54,7 +54,6 @@ import org.spongepowered.common.text.translation.SpongeTranslation;
 
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.IdentityHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -65,7 +64,7 @@ public final class EntityTypeRegistryModule implements ExtraClassCatalogRegistry
     @RegisterCatalog(EntityTypes.class)
     protected final Map<String, SpongeEntityType> entityTypeMappings = Maps.newHashMap();
 
-    public final Map<Class<? extends Entity>, SpongeEntityType> entityClassToTypeMappings = new IdentityHashMap<>();
+    public final Map<Class<? extends Entity>, SpongeEntityType> entityClassToTypeMappings = Maps.newHashMap();
     private final Set<FutureRegistration> customEntities = new HashSet<>();
 
     public static EntityTypeRegistryModule getInstance() {
